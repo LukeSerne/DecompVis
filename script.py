@@ -7,12 +7,17 @@ import copy
 from util import Operation, Identifier, AddrSpace, InstructionReference
 
 class DecompStep:
-    def __init__(self, debug_output):
+    _lines: bytes
+    _id: int
+    _rule_name: str
+    _changes: list[tuple[Operation, Operation]]
+
+    def __init__(self, debug_output: bytes):
         # DEBUG {id}: {rule_name}
         # {old_line}
         #    {new_line}
         # {for old_line, new_line in changed_lines}
-        self.lines = debug_output
+        self._lines = debug_output
         lines = debug_output.split(b"\n")
 
         top_line_parts = lines[0].split(b" ", 2)
@@ -20,23 +25,24 @@ class DecompStep:
         self._id = int(top_line_parts[1].rstrip(b":"))
         self._rule_name = top_line_parts[2].decode('utf-8')
 
-        self._changes = []  # list[tuple[Operation, Operation]]
+        self._changes = []
         for change_line_num in range((len(lines) - 1) // 2):
             old_line = Operation.from_raw(lines[1 + change_line_num * 2])
             new_line = Operation.from_raw(lines[2 + change_line_num * 2])
             self._changes.append((old_line, new_line))
 
     def __str__(self) -> str:
-        return f"DecompStep {self.get_short_desc()}\nChanges:\n  " + "\n  ".join(["\n    ->\n  ".join(map(str, c)) for c in self._changes]) + f"\n{self.lines.decode('utf-8')}"
+        return f"DecompStep {self.get_short_desc()}\nChanges:\n  " + "\n  ".join(["\n    ->\n  ".join(map(str, c)) for c in self._changes]) + f"\n{self._lines.decode('utf-8')}"
 
     def get_short_desc(self) -> str:
         return f"{self._id} (rule: {self._rule_name!r})"
 
 class DecompState:
-    # Represents the state of the data flow graph at a specific point in time
-    # Maybe make this a networkx graph?
+    # Represents the state of the data flow graph at a specific point in the
+    # decompilation process
+    _state: networkx.DiGraph
 
-    def __init__(self, prev_state: 'DecompState' = None):
+    def __init__(self, prev_state: typing.Optional['DecompState'] = None):
         if prev_state is not None:
             self._state = prev_state.get_graph().copy()
         else:
@@ -133,14 +139,18 @@ class DecompState:
         return self._state
 
 class Decomp:
+    _steps: list[DecompStep]
+    _states: list[DecompState]
+
     def __init__(self, initial_pcode: bytes):
-        self._steps: list[DecompStep] = []
-        self._states = [DecompState()]
-        self._states[0].set_state([
+        self._steps = []
+        initial_state = DecompState()
+        initial_state.set_state([
             Operation.from_raw(line.replace(b"\t", b" "))
             for line in initial_pcode.split(b"\n")
             if b":" in line
         ])
+        self._states = [initial_state]
 
     def add_step(self, step: DecompStep):
         self._steps.append(step)
@@ -161,4 +171,3 @@ class Decomp:
 
     def get_state(self, idx: int) -> DecompState:
         return self._states[idx]
-

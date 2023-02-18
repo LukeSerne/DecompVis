@@ -327,12 +327,12 @@ class GraphView(QGraphicsView):
         # Used to add space between nodes
         self._graph_scale = 10
 
-        # Map node name to Node object {str=>Node}
-        self._nodes_map = {}
+        # Map node name to Node object
+        self._nodes_map: dict[str, Node] = {}
 
         if self._graph is not None:
             self._load_graph()
-            self.set_nx_layout()
+            self.set_pos()
 
     def set_graph(self, graph: typing.Optional[networkx.DiGraph]):
         """Set the networkx graph"""

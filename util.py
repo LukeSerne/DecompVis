@@ -1,7 +1,9 @@
+import pwnlib.tubes
+
 from dataclasses import dataclass
 import typing
 
-def get_decompile_data(decomp: 'pwn.process', xml_path: str, func_name: str) -> tuple[bytes, list[bytes]]:
+def get_decompile_data(decomp: pwnlib.tubes.process, xml_path: str, func_name: str) -> tuple[bytes, list[bytes]]:
     """
     Executes the decompiler on the given xml file and returns the P-CODE diffs
     and initial P-CODE.
@@ -9,30 +11,30 @@ def get_decompile_data(decomp: 'pwn.process', xml_path: str, func_name: str) -> 
     # Load file
     decomp.sendline(f"restore {xml_path}".encode('utf-8'))
     decomp.readline()
-    restore_resp = decomp.readuntil(b"\n[decomp]> ")
+    restore_resp: bytes = decomp.readuntil(b"\n[decomp]> ")
     restore_resp_exp = f"{xml_path} successfully loaded: ".encode('utf-8')
     if not restore_resp.startswith(restore_resp_exp):
         print(f"Unexpected response to 'restore {xml_path}': ")
-        print(f"  {restore_resp}")
-        print(f"  {restore_resp_exp}")
+        print(f"  {restore_resp!r}")
+        print(f"  {restore_resp_exp!r}")
         return b"", []
 
     # Select the function
     decomp.sendline(f"load function {func_name}".encode('utf-8'))
     decomp.readline()
-    load_resp = decomp.readuntil(b"\n[decomp]> ")
+    load_resp: bytes = decomp.readuntil(b"\n[decomp]> ")
     load_resp_exp = f"Function {func_name}: ".encode('utf-8')
     if not load_resp.startswith(load_resp_exp):
-        print(f"Unexpected response to 'load function {func_name}': {load_resp} (expected something starting with {load_resp_exp})")
+        print(f"Unexpected response to 'load function {func_name}': {load_resp!r} (expected something starting with {load_resp_exp!r})")
         return b"", []
 
     # Trace the entire function
     decomp.sendline(b"trace address")
     decomp.readline()
-    trace_resp = decomp.readuntil(b"\n[decomp]> ")
+    trace_resp: bytes = decomp.readuntil(b"\n[decomp]> ")
     trace_resp_exp = b"OK (1 ranges)\n[decomp]> "
     if trace_resp != trace_resp_exp:
-        print(f"Unexpected response to 'trace address': {trace_resp} (expected {trace_resp_exp})")
+        print(f"Unexpected response to 'trace address': {trace_resp!r} (expected {trace_resp_exp!r})")
         return b"", []
 
     # Get the initial pcode state
@@ -227,27 +229,29 @@ class Operation:
     _is_empty: bool
     # the CPUI name of this operation
     _op: str
-    # a list of inputs
-    _in: list[Identifier | AddrSpace | InstructionReference]
+    # a sequence of inputs
+    _in: typing.Sequence[Identifier | AddrSpace | InstructionReference | None]
     # the output identifier
     _out: typing.Optional[Identifier]
 
     @staticmethod
     def from_raw(line: bytes):
-        line = line.decode('utf-8').strip(" ")
-        full_line = line
+        full_line = line.decode('utf-8').strip(" ")
 
         # eg. 0x800fb41c:22: u0x1000000d:1(0x800fb41c:22) = u0x10000012:1(0x800fb41c:61)
-        parts = line.split(" ")
+        parts = full_line.split(" ")
         assert parts[0].endswith(":")
         addr = parts[0][:-1]
         num_parts = len(parts)
+
+        _in: list[Identifier | AddrSpace | InstructionReference | None] = []
+        _op: typing.Optional[str] = None
 
         # might be ** (empty)
         is_empty = parts[1] == "**" and num_parts == 2
 
         if is_empty:
-            return Operation(full_line, addr, True, "", [], None)
+            return Operation(full_line, addr, True, "", _in, None)
 
         if parts[1].startswith("*("):  # TypeOpStore
             assert parts[2] == "=", parts
@@ -272,7 +276,6 @@ class Operation:
             return Operation(full_line, addr, False, "CBRANCH", _in, None)
 
         if parts[1] == "return" or parts[1].startswith("return("):  # TypeOpReturn
-            in_ = []
             if "(" in parts[1]:
                 # return(<in0>) <in1>,<in2>,...
                 in0 = Identifier.from_raw(parts[1][:-1].split("(", 1)[1])
@@ -487,7 +490,6 @@ class Operation:
             else:
                 assert args[-1] == ")", (args, parts)
                 _in = [Identifier.from_raw(i) for i in args[:-1].split(",")]
-
 
             return Operation(full_line, addr, False, _op, _in, _out)
 

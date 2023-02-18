@@ -43,11 +43,9 @@ class DecompState:
             self._state = networkx.DiGraph()
 
     def set_state(self, operations: list[Operation]):
-        # Create a data flow graph out of these operations. Nodes should be linked
-        # by name, but the (address) notation confuses me a bit...
-        # I should look into that.
+        # Create a data flow graph out of the given operations
 
-        edges_to_create = []
+        edges_to_create: list[tuple[str | Identifier | AddrSpace, str | Identifier | Operation]] = []
 
         for op in operations:
             # Add node
@@ -136,7 +134,7 @@ class DecompState:
 
 class Decomp:
     def __init__(self, initial_pcode: bytes):
-        self._steps = []
+        self._steps: list[DecompStep] = []
         self._states = [DecompState()]
         self._states[0].set_state([
             Operation.from_raw(line.replace(b"\t", b" "))

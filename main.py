@@ -1,9 +1,10 @@
-import pwn
+import pwnlib.tubes
 from PySide6 import QtWidgets, QtGui, QtCore
 
 import sys
 import os
 import traceback
+import typing
 
 from util import get_decompile_data
 from script import Decomp, DecompStep
@@ -19,8 +20,8 @@ class MainWindow(QtWidgets.QMainWindow):
     xml_path: str = ""
     ghidra_dir: str = ""
 
-    decomp: Decomp = None
-    graph_view: GraphView = None
+    decomp: typing.Optional[Decomp] = None
+    graph_view: GraphView
     decomp_step: int = 0
 
     def __init__(self):
@@ -113,26 +114,25 @@ class MainWindow(QtWidgets.QMainWindow):
 
         env_vars = {"SLEIGHHOME": self.ghidra_dir}
 
-        with pwn.process(self.decomp_dbg_path, env=env_vars) as p:
-            # Read past the first input prompt
-            p.readuntil(b"[decomp]> ")
-
-            initial_pcode, data = get_decompile_data(
-                p, self.xml_path, self.xml_func_name
-            )
-
-        decomp = None
-
         try:
+            with pwnlib.tubes.process.process(self.decomp_dbg_path, env=env_vars) as p:
+                # Read past the first input prompt
+                p.readuntil(b"[decomp]> ")
+
+                initial_pcode, data = get_decompile_data(
+                    p, self.xml_path, self.xml_func_name
+                )
+
+            decomp = None
+
             decomp = Decomp(initial_pcode)
             for i, rule in enumerate(data):
-                print("Step", i)
                 decomp.add_step(DecompStep(rule))
         except:
-            print("Exception!")
+            print("Exception while loading the Decompiler data!")
             print(traceback.format_exc())
             if decomp is None:
-                print("Cancelling!")
+                print("Cancelling loading!")
                 return
 
         self.load_data_done.emit(decomp, initial_pcode.decode("utf-8"))
@@ -144,7 +144,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.list_widget.clear()
         self.list_widget.addItems(
-            ["Raw PCODE"]
+            ["Raw P-CODE"]
             + [
                 self.decomp.get_step(i).get_short_desc()
                 for i in range(self.decomp.get_num_steps())

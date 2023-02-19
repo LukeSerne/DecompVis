@@ -216,7 +216,11 @@ class Identifier:
         return f"{self._space_shortcut}{self._name}"
 
     def get_color_name(self) -> str:
-        return "yellow" if self._is_input else "green"
+        if self._is_input:
+            return "yellow"
+        if self.is_constant():
+            return "gray"
+        return "green"
 
     def get_tooltip_text(self) -> typing.Optional[str]:
         return self.__str__()

@@ -35,10 +35,11 @@ class Node(QGraphicsObject):
         "red": QColor("#E31E1B"),
         "blue": QColor("#2B42E3"),
         "yellow": QColor("#D2E31B"),
+        "gray": QColor("#777777"),
     }
 
     COLOR_NAMES: list[str] = [
-        "brown", "green", "red", "blue", "yellow"
+        "brown", "green", "red", "blue", "yellow", "gray"
     ]
 
     _name: str
@@ -154,7 +155,7 @@ class Node(QGraphicsObject):
 
 
 class Edge(QGraphicsItem):
-    def __init__(self, source: Node, dest: Node, parent: QGraphicsItem = None):
+    def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, parent: QGraphicsItem = None):
         """Edge constructor
 
         Args:
@@ -164,6 +165,8 @@ class Edge(QGraphicsItem):
         super().__init__(parent)
         self._source = source
         self._dest = dest
+        self._dest_index = dest_index
+        self._dest_num_inputs = dest_num_inputs
 
         self._tickness = 2
         self._color = "#2BB53C"
@@ -173,16 +176,14 @@ class Edge(QGraphicsItem):
         self._dest.add_edge(self)
 
         self._line = QLineF()
-        self._target_pos = None
 
         self.setZValue(-1)
         self.adjust()
 
     def boundingRect(self) -> QRectF:
-        """Override from QGraphicsItem
-
-        Returns:
-            QRect: Return node bounding rect
+        """
+        Returns a rect with corners at the centers of the source and
+        destination node.
         """
         return (
             QRectF(self._line.p1(), self._line.p2())

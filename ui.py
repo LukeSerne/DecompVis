@@ -78,6 +78,10 @@ class Node(QGraphicsObject):
         )
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
 
+        tooltip_text = item.get_tooltip_text()
+        if tooltip_text is not None:
+            self.setToolTip(tooltip_text)
+
     def add_edge(self, edge: "Edge"):
         """Add an edge to this node"""
         self._edges.append(edge)

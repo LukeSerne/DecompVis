@@ -99,6 +99,9 @@ class AddrSpace:
     def get_color_name(self) -> str:
         return "brown"
 
+    def get_tooltip_text(self) -> typing.Optional[str]:
+        return None
+
 @dataclass(frozen=True)
 class Identifier:
     # Actually a Varnode
@@ -215,6 +218,9 @@ class Identifier:
     def get_color_name(self) -> str:
         return "yellow" if self._is_input else "green"
 
+    def get_tooltip_text(self) -> typing.Optional[str]:
+        return self.__str__()
+
 @dataclass(frozen=True)
 class InstructionReference:
     _target_addr: str = ""  # The address of the target operation
@@ -230,6 +236,9 @@ class InstructionReference:
 
     def get_color_name(self) -> str:
         return "blue"
+
+    def get_tooltip_text(self) -> typing.Optional[str]:
+        return None
 
 @dataclass(frozen=True)
 class Operation:
@@ -558,12 +567,6 @@ class Operation:
 
         raise ValueError(f"Unparsable printRaw output: {parts}")
 
-    def get_node_name(self) -> str:
-        return self._op
-
-    def get_color_name(self) -> str:
-        return "red"
-
     def __str__(self):
         if self._is_empty:
             return f"{self._addr}: **"
@@ -579,3 +582,12 @@ class Operation:
         if self._is_empty:
             return ().__hash__()
         return (self._out, self._op, *self._in).__hash__()
+
+    def get_node_name(self) -> str:
+        return self._op
+
+    def get_color_name(self) -> str:
+        return "red"
+
+    def get_tooltip_text(self) -> typing.Optional[str]:
+        return self.__str__()

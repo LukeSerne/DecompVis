@@ -29,12 +29,26 @@ class Node(QGraphicsObject):
 
     """A QGraphicsItem representing node in a graph"""
 
-    COLORS: dict[str, str] = {
-        "green": "#5AD469",
-        "red": "#E31E1B",
-        "blue": "#1B32E3",
-        "yellow": "#D2E31B",
+    COLORS: dict[str, QColor] = {
+        "brown": QColor("#9E5700"),
+        "green": QColor("#5AD469"),
+        "red": QColor("#E31E1B"),
+        "blue": QColor("#2B42E3"),
+        "yellow": QColor("#D2E31B"),
     }
+
+    COLOR_NAMES: list[str] = [
+        "brown", "green", "red", "blue", "yellow"
+    ]
+
+    _name: str
+    _edges: list["Edge"]
+    _color_name: str
+    _color: QColor
+    _bg_brush: QBrush
+    _border_pen: QPen
+    _is_selected: bool
+    _rect: QRectF
 
     def __init__(self, item, parent=None):
         """Node constructor
@@ -43,14 +57,20 @@ class Node(QGraphicsObject):
             item: Item the node represents
         """
         super().__init__(parent)
-        self._name = str(item)
-        self._is_op = isinstance(item, Operation)
+
+        self._name = item.get_node_name()
+        self._color_name = item.get_color_name()
+
         self._edges = []
-        self._color = self.COLORS["green"] if not self._is_op else self.COLORS["blue"]
+        self._color = self.COLORS[self._color_name]
         self._is_selected = False
+        self._bg_brush = QBrush(self._color)
+        self._border_pen = QPen(
+            self._color.darker(), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+        )
 
+        # Calculate bounding rect by adding a 10 pixel margin around the name
         name_rect = QFontMetricsF(QFont()).boundingRect(self._name)
-
         self._rect = QRectF(0, 0, name_rect.width() + 10, name_rect.height() + 10)
 
         self.setFlags(
@@ -58,12 +78,8 @@ class Node(QGraphicsObject):
         )
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
 
-    def add_edge(self, edge):
-        """Add an edge to this node
-
-        Args:
-            edge (Edge)
-        """
+    def add_edge(self, edge: "Edge"):
+        """Add an edge to this node"""
         self._edges.append(edge)
 
     def mousePressEvent(self, ev):
@@ -72,13 +88,21 @@ class Node(QGraphicsObject):
         # Change the colour when the node is right-clicked, highlight the edge
         # when left-clicked.
         if ev.button() == Qt.RightButton:
-            color_names = ["green", "red", "blue", "yellow"]
-            colors = [self.COLORS[name] for name in color_names]
-            color_idx = colors.index(self._color)
-            self._color = self.COLORS[color_names[(color_idx + 1) % len(color_names)]]
+            color_idx = self.COLOR_NAMES.index(self._color_name)
+            self._color_name = self.COLOR_NAMES[(color_idx + 1) % len(self.COLOR_NAMES)]
+            self._color = self.COLORS[self._color_name]
+            self._bg_brush = QBrush(self._color)
+            border_color = self._color.lighter() if self._is_selected else self._color.darker()
+            self._border_pen = QPen(
+                border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+            )
 
-        elif ev.button() == Qt.LeftButton:
+        elif ev.button() == Qt.MiddleButton:
             self._is_selected = not self._is_selected
+            border_color = self._color.lighter() if self._is_selected else self._color.darker()
+            self._border_pen = QPen(
+                border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+            )
 
         else:
             return
@@ -107,34 +131,17 @@ class Node(QGraphicsObject):
             painter (QPainter)
             option (QStyleOptionGraphicsItem)
         """
-        base_border = QColor(self._color)
-        border_color = base_border.lighter() if self._is_selected else base_border.darker()
+        bound_rect = self.boundingRect()
 
         painter.setRenderHints(QPainter.Antialiasing)
-        painter.setPen(
-            QPen(
-                border_color,
-                2,
-                Qt.SolidLine,
-                Qt.RoundCap,
-                Qt.RoundJoin,
-            )
-        )
-        painter.setBrush(QBrush(QColor(self._color)))
-        painter.drawRoundedRect(self.boundingRect(), 5, 5)
+        painter.setPen(self._border_pen)
+        painter.setBrush(self._bg_brush)
+        painter.drawRoundedRect(bound_rect, 5, 5)
         painter.setPen(QPen(QColor("black")))
-        painter.drawText(self.boundingRect(), Qt.AlignCenter, self._name)
+        painter.drawText(bound_rect, Qt.AlignCenter, self._name)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):
-        """Override from QGraphicsItem
-
-        Args:
-            change (QGraphicsItem.GraphicsItemChange)
-            value (Any)
-
-        Returns:
-            Any
-        """
+        """Adjusts all edges when the item is moved"""
         if change == QGraphicsItem.ItemPositionHasChanged:
             for edge in self._edges:
                 edge.adjust()

@@ -93,8 +93,11 @@ class AddrSpace:
     def from_raw(name: str):
         return AddrSpace(name)
 
-    def node_str(self) -> str:
+    def get_node_name(self) -> str:
         return f"{self._name}"
+
+    def get_color_name(self) -> str:
+        return "brown"
 
 @dataclass(frozen=True)
 class Identifier:
@@ -206,8 +209,11 @@ class Identifier:
     def __str__(self) -> str:
         return f"ID({self._space_shortcut}{self._name} @ {self._seq_num}{' free' if self._is_free else ''}{' input' if self._is_input else ''})"
 
-    def node_str(self) -> str:
+    def get_node_name(self) -> str:
         return f"{self._space_shortcut}{self._name}"
+
+    def get_color_name(self) -> str:
+        return "yellow" if self._is_input else "green"
 
 @dataclass(frozen=True)
 class InstructionReference:
@@ -218,6 +224,12 @@ class InstructionReference:
         ident = Identifier.from_raw(name)
         assert ident._space_shortcut == "i", name
         return InstructionReference(ident._name)
+
+    def get_node_name(self) -> str:
+        return f"REF {self._target_addr}"
+
+    def get_color_name(self) -> str:
+        return "blue"
 
 @dataclass(frozen=True)
 class Operation:
@@ -545,6 +557,12 @@ class Operation:
             return Operation(full_line, addr, False, _op, _in, _out)
 
         raise ValueError(f"Unparsable printRaw output: {parts}")
+
+    def get_node_name(self) -> str:
+        return self._op
+
+    def get_color_name(self) -> str:
+        return "red"
 
     def __str__(self):
         if self._is_empty:

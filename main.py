@@ -7,7 +7,7 @@ import traceback
 import typing
 
 from util import get_decompile_data
-from script import Decomp, DecompStep
+from decomp import Decomp, DecompStep
 from ui import GraphView
 
 class MainWindow(QtWidgets.QMainWindow):

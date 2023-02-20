@@ -69,6 +69,9 @@ class Node(QGraphicsObject):
         self._border_pen = QPen(
             self._color.darker(), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
         )
+        self._text_pen = QPen(QColor(
+            "white" if self._color_name in {"brown", "gray"} else "black"
+        ))
 
         # Calculate bounding rect by adding a 10 pixel margin around the name
         name_rect = QFontMetricsF(QFont()).boundingRect(self._name)
@@ -101,6 +104,9 @@ class Node(QGraphicsObject):
             self._border_pen = QPen(
                 border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
             )
+            self._text_pen = QPen(QColor(
+                "white" if self._color_name in {"brown", "gray"} else "black"
+            ))
 
         elif ev.button() == Qt.MiddleButton:
             self._is_selected = not self._is_selected
@@ -142,7 +148,7 @@ class Node(QGraphicsObject):
         painter.setPen(self._border_pen)
         painter.setBrush(self._bg_brush)
         painter.drawRoundedRect(bound_rect, 5, 5)
-        painter.setPen(QPen(QColor("black")))
+        painter.setPen(self._text_pen)
         painter.drawText(bound_rect, Qt.AlignCenter, self._name)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):

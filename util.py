@@ -190,7 +190,7 @@ class Identifier:
         """
         Basically copied from Varnode::operator== in 'varnode.cc'
         """
-        # if not isinstance(other, Identifier): return NotImplemented
+        if not isinstance(other, Identifier): return NotImplemented
         if self is other: return True
         if self._space_shortcut == "#": return False  # Constants are always different
 

@@ -156,12 +156,6 @@ class Node(QGraphicsObject):
 
 class Edge(QGraphicsItem):
     def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, parent: QGraphicsItem = None):
-        """Edge constructor
-
-        Args:
-            source (Node): source node
-            dest (Node): destination node
-        """
         super().__init__(parent)
         self._source = source
         self._dest = dest
@@ -202,84 +196,49 @@ class Edge(QGraphicsItem):
         This method is called from Node::itemChange
         """
         self.prepareGeometryChange()
-        self._line = QLineF(
-            self._source.pos() + self._source.boundingRect().center(),
-            self._dest.pos() + self._dest.boundingRect().center(),
-        )
 
-        self._target_pos = self._arrow_target()
+        self._source_pos = self._source.pos() + self._source.boundingRect().center()
+        target_pos = self.get_arrow_target()
 
-    def _draw_arrow(self, painter: QPainter, start: QPointF, end: QPointF):
-        """Draw arrow from start point to end point.
+        self._line = QLineF(self._source_pos, target_pos)
 
-        Args:
-            painter (QPainter)
-            start (QPointF): start position
-            end (QPointF): end position
-        """
-        painter.setBrush(QBrush(self._color))
+        angle = math.atan2(self._line.dy(), -self._line.dx())
 
-        line = QLineF(end, start)
-
-        angle = math.atan2(-line.dy(), line.dx())
-        arrow_p1 = line.p1() + QPointF(
+        arrow_p1 = QPointF(
             math.sin(angle + math.pi / 3) * self._arrow_size,
             math.cos(angle + math.pi / 3) * self._arrow_size,
         )
-        arrow_p2 = line.p1() + QPointF(
-            math.sin(angle + math.pi - math.pi / 3) * self._arrow_size,
-            math.cos(angle + math.pi - math.pi / 3) * self._arrow_size,
+        arrow_p2 = QPointF(
+            math.sin(angle + math.pi * 2 / 3) * self._arrow_size,
+            math.cos(angle + math.pi * 2 / 3) * self._arrow_size,
         )
 
-        arrow_head = QPolygonF()
-        arrow_head.clear()
-        arrow_head.append(line.p1())
-        arrow_head.append(arrow_p1)
-        arrow_head.append(arrow_p2)
-        painter.drawLine(line)
-        painter.drawPolygon(arrow_head)
+        self._arrow_head_polygon = QPolygonF([QPointF(0, 0), arrow_p1, arrow_p2])
+        self._arrow_head_polygon.translate(target_pos)
 
-    def _arrow_target(self) -> QPointF:
+    def get_arrow_target(self) -> QPointF:
         """
         Calculate the end position of the arrow taking into account the size
-        and shape of the destination node
-
-        Returns:
-            QPointF
+        and shape of the destination node and the input id that this node represents
         """
-        return self.get_edge_point(self._dest.pos(), self._dest.shape(), self._line)
+        return self.get_edge_point(self._dest.pos(), self._dest.shape(), self._source_pos, self._dest_index, self._dest_num_inputs)
 
     def get_edge_point(
-        self, shape_offset: QPointF, shape: QPainterPath, line: QLineF
+        self, shape_offset: QPointF, shape: QPainterPath, out_point: QPointF, offset: int, slots: int
     ) -> QPointF:
 
-        # Translate the shape into the line coordinate system
+        # Translate the shape into the destination point coordinate system
         shape.translate(shape_offset)
-
-        # Move point along the line until it intersects the shape. We assume
-        # there is only 1 intersection and use binary search.
-
-        # TODO: Possible optimisation: Limit the line to the shape's bounding box
-        shape_box = shape.boundingRect()
-        shape_box_top = shape_box.top()
-        shape_box_bottom = shape_box.bottom()
-        shape_box_left = shape_box.left()
-        shape_box_right = shape_box.right()
-
-        clamp = lambda v, mi, ma: min(ma, max(mi, v))
-
-        out_point = QPointF(
-            clamp(line.p1().x(), shape_box_left, shape_box_right),
-            clamp(line.p1().y(), shape_box_top, shape_box_bottom),
-        )
 
         if shape.contains(out_point):
             return out_point
 
-        in_point = QPointF(
-            clamp(line.p2().x(), shape_box_left, shape_box_right),
-            clamp(line.p2().y(), shape_box_top, shape_box_bottom),
-        )
+        # Move point along the line until it intersects the shape. We assume
+        # there is only 1 intersection and use binary search.
+        shape_box = shape.boundingRect()
+
+        left_offset = shape_box.width() * (offset + 1) / (slots + 1)
+        in_point = shape_box.topLeft() + QPointF(left_offset, 0)
 
         close_enough = (
             lambda a, b: abs(a.x() - b.x()) < 0.1 and abs(a.y() - b.y()) < 0.1
@@ -298,26 +257,13 @@ class Edge(QGraphicsItem):
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget=None):
         """Override from QGraphicsItem
 
-        Draw Edge. This method is called from Edge.adjust()
-
-        Args:
-            painter (QPainter)
-            option (QStyleOptionGraphicsItem)
+        Draw Edge. This method is called from Edge::adjust
         """
-
-        if self._source and self._dest:
-            painter.setRenderHints(QPainter.Antialiasing)
-
-            painter.setPen(
-                QPen(
-                    QColor(self._color),
-                    self._tickness,
-                    Qt.SolidLine,
-                    Qt.RoundCap,
-                    Qt.RoundJoin,
-                )
-            )
-            self._draw_arrow(painter, self._line.p1(), self._target_pos)
+        painter.setRenderHints(QPainter.Antialiasing)
+        painter.setPen(QPen(QColor(self._color), self._tickness, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.setBrush(QBrush(self._color))
+        painter.drawLine(self._line)
+        painter.drawPolygon(self._arrow_head_polygon)
 
 
 class GraphView(QGraphicsView):
@@ -370,7 +316,7 @@ class GraphView(QGraphicsView):
             x, y = pos
             x *= self._graph_scale * num_items
             y *= self._graph_scale * num_items
-            item = self._nodes_map[node]
+            item, _ = self._nodes_map[node]
             item.setPos(x, y)
 
     def _load_graph(self):
@@ -385,10 +331,20 @@ class GraphView(QGraphicsView):
         for node, node_item in self._graph.nodes(data="node_item"):
             item = Node(node_item)
             self.scene().addItem(item)
-            self._nodes_map[node] = item
+            self._nodes_map[node] = (item, node_item)
 
         # Add edges
         for a, b in self._graph.edges:
-            source = self._nodes_map[a]
-            dest = self._nodes_map[b]
-            self.scene().addItem(Edge(source, dest))
+            source, source_item = self._nodes_map[a]
+            dest, dest_item = self._nodes_map[b]
+
+            # When the edge points into an Operation, the arrow head of the edge
+            # should be offset to indicate the input order.
+            if isinstance(dest_item, Operation):
+                offset = dest_item._in.index(source_item)
+                slots = len(dest_item._in)
+            else:
+                offset = 0
+                slots = 1
+
+            self.scene().addItem(Edge(source, dest, offset, slots))

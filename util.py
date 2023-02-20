@@ -81,7 +81,7 @@ class AddrSpace:
     def __str__(self) -> str:
         return f"AddrSpace({self._name})"
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, AddrSpace): return NotImplemented
 
         return self._name == other._name
@@ -90,7 +90,7 @@ class AddrSpace:
         return (self._name,).__hash__()
 
     @staticmethod
-    def from_raw(name: str):
+    def from_raw(name: str) -> "AddrSpace":
         return AddrSpace(name)
 
     def get_node_name(self) -> str:
@@ -114,7 +114,7 @@ class Identifier:
     _name: str = ""
 
     @staticmethod
-    def from_raw(name: str):
+    def from_raw(name: str) -> "Identifier":
         # base:
         # <reg>
         # <reg>\+\d+
@@ -230,7 +230,7 @@ class InstructionReference:
     _target_addr: str = ""  # The address of the target operation
 
     @staticmethod
-    def from_raw(name: str):
+    def from_raw(name: str) -> "InstructionReference":
         ident = Identifier.from_raw(name)
         assert ident._space_shortcut == "i", name
         return InstructionReference(ident._name)
@@ -260,7 +260,7 @@ class Operation:
     _out: typing.Optional[Identifier]
 
     @staticmethod
-    def from_raw(line: bytes):
+    def from_raw(line: bytes) -> "Operation":
         full_line = line.decode('utf-8').strip(" ")
 
         # eg. 0x800fb41c:22: u0x1000000d:1(0x800fb41c:22) = u0x10000012:1(0x800fb41c:61)
@@ -571,7 +571,7 @@ class Operation:
 
         raise ValueError(f"Unparsable printRaw output: {parts}")
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self._is_empty:
             return f"{self._addr}: **"
 
@@ -582,7 +582,7 @@ class Operation:
 
         return out + f"{self._op} [ {' , '.join(str(x) for x in self._in)} ]"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if self._is_empty:
             return ().__hash__()
         return (self._out, self._op, *self._in).__hash__()

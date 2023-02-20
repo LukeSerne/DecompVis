@@ -93,8 +93,8 @@ class Node(QGraphicsObject):
     def mousePressEvent(self, ev):
         super().mousePressEvent(ev)
 
-        # Change the colour when the node is right-clicked, highlight the edge
-        # when left-clicked.
+        # Change the colour when the node is right-clicked, highlight the node
+        # when middle-clicked.
         if ev.button() == Qt.RightButton:
             color_idx = self.COLOR_NAMES.index(self._color_name)
             self._color_name = self.COLOR_NAMES[(color_idx + 1) % len(self.COLOR_NAMES)]
@@ -273,13 +273,10 @@ class Edge(QGraphicsItem):
 
 
 class GraphView(QGraphicsView):
-    def __init__(self, graph: networkx.DiGraph, parent=None):
+    def __init__(self, graph: typing.Optional[networkx.DiGraph], parent=None):
         """GraphView constructor
 
-        This widget can display a directed graph
-
-        Args:
-            graph (networkx.DiGraph): a networkx directed graph
+        This widget can display a directed graph.
         """
         super().__init__()
 

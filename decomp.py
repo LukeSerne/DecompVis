@@ -55,7 +55,7 @@ class DecompState:
 
         for op in operations:
             # Add node
-            self._state.add_node(op._addr, op=op._op, is_varnode=False, name=op._op, node_item=op)
+            self._state.add_node(op._addr, node_item=op)
 
             # Add output edge (and output varnode if it doesn't exist already)
             if op._out is not None:
@@ -63,7 +63,7 @@ class DecompState:
                 assert isinstance(out_node, Identifier), (type(out_node), out_node)
 
                 if out_node not in self._state:
-                    self._state.add_node(out_node, op=None, is_varnode=True, name=str(out_node), node_item=out_node)
+                    self._state.add_node(out_node, node_item=out_node)
 
                 edges_to_create.append((op._addr, out_node))
 
@@ -80,7 +80,7 @@ class DecompState:
 
                 else:
                     if inp not in self._state:
-                        self._state.add_node(inp, op=None, is_varnode=True, name=str(inp), node_item=inp)
+                        self._state.add_node(inp, node_item=inp)
 
                     edges_to_create.append((inp, op._addr))
 
@@ -114,7 +114,7 @@ class DecompState:
 
             if not new_line._is_empty:
                 # Add node
-                self._state.add_node(new_line._addr, op=new_line._op, is_varnode=False, name=new_line._op, node_item=new_line)
+                self._state.add_node(new_line._addr, node_item=new_line)
 
                 # Add new edges
                 if new_line._out is not None:
@@ -122,7 +122,7 @@ class DecompState:
                     assert isinstance(out_node, Identifier), (type(out_node), out_node)
 
                     if out_node not in self._state:
-                        self._state.add_node(out_node, op=None, is_varnode=True, name=str(out_node), node_item=out_node)
+                        self._state.add_node(out_node, node_item=out_node)
 
                     self._state.add_edge(new_line._addr, out_node)
 
@@ -131,7 +131,7 @@ class DecompState:
                     assert isinstance(inp, (Identifier, AddrSpace, InstructionReference)), (type(inp), inp)
 
                     if inp not in self._state:
-                        self._state.add_node(inp, op=None, is_varnode=True, name=str(inp), node_item=inp)
+                        self._state.add_node(inp, node_item=inp)
 
                     self._state.add_edge(inp, new_line._addr)
 

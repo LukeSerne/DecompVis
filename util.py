@@ -1,57 +1,49 @@
-import pwnlib.tubes
-
+import subprocess
 from dataclasses import dataclass
 import typing
 
-def get_decompile_data(decomp: pwnlib.tubes.process, xml_path: str, func_name: str) -> tuple[bytes, list[bytes]]:
+def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str) -> tuple[bytes, list[bytes]]:
     """
     Executes the decompiler on the given xml file and returns the P-CODE diffs
     and initial P-CODE.
     """
-    # Load file
-    decomp.sendline(f"restore {xml_path}".encode('utf-8'))
-    decomp.readline()
-    restore_resp: bytes = decomp.readuntil(b"\n[decomp]> ")
-    restore_resp_exp = f"{xml_path} successfully loaded: ".encode('utf-8')
-    if not restore_resp.startswith(restore_resp_exp):
-        print(f"Unexpected response to 'restore {xml_path}': ")
-        print(f"  {restore_resp!r}")
-        print(f"  {restore_resp_exp!r}")
-        return b"", []
+    # TODO: This converts str to bytes only for later functions (eg. Operation::from_raw)
+    # to convert the bytes back to str. Consider just returning str from this
+    # function.
 
-    # Select the function
-    decomp.sendline(f"load function {func_name}".encode('utf-8'))
-    decomp.readline()
-    load_resp: bytes = decomp.readuntil(b"\n[decomp]> ")
-    load_resp_exp = f"Function {func_name}: ".encode('utf-8')
-    if not load_resp.startswith(load_resp_exp):
-        print(f"Unexpected response to 'load function {func_name}': {load_resp!r} (expected something starting with {load_resp_exp!r})")
-        return b"", []
+    input_commands = (
+        f"restore {xml_path}\n"
+        f"load function {func_name}\n"
+        "trace address\n"
+        "print raw\n"
+        "decompile\n"
+        "quit\n"
+    )
 
-    # Trace the entire function
-    decomp.sendline(b"trace address")
-    decomp.readline()
-    trace_resp: bytes = decomp.readuntil(b"\n[decomp]> ")
-    trace_resp_exp = b"OK (1 ranges)\n[decomp]> "
-    if trace_resp != trace_resp_exp:
-        print(f"Unexpected response to 'trace address': {trace_resp!r} (expected {trace_resp_exp!r})")
-        return b"", []
+    output = subprocess.run(
+        decomp_path, input=input_commands, env={"SLEIGHHOME": ghidra_path},
+        capture_output=True, check=True, text=True
+    ).stdout
 
-    # Get the initial pcode state
-    decomp.sendline(b"print raw")
-    decomp.readline()
-    initial_pcode = decomp.readuntil(b"\n[decomp]> ").rstrip(b"\n[decomp]> ")
+    lines = output.split("\n")
+    if not lines[1].startswith(f"{xml_path} successfully loaded: "):
+        raise ValueError(f"Unexpected response to 'restore {xml_path}': {lines[1]!r}")
+    if not lines[3].startswith(f"Function {func_name}: "):
+        raise ValueError(f"Unexpected response to 'load function {func_name}': {lines[3]!r}")
+    if lines[5] != "OK (1 ranges)":
+        raise ValueError(f"Unexpected response to 'trace address': {lines[5]!r}")
 
-    # Start the actual decompile
-    decomp.sendline(b"decompile")
-    decomp.readline()  # our input
-    decomp.readline()  # 'Decompiling {func_name}'
+    # Calculate begin and end of the decompilation output
+    decomp_cmd_idx = lines.index("[decomp]> decompile")
+    decomp_end_idx = lines.index("Decompilation complete", decomp_cmd_idx)
 
-    decomp_log = decomp.readuntil(b"Decompilation complete\n[decomp]> ").rstrip(b"Decompilation complete\n[decomp]>").split(b"\n\n")
+    # The first 7 lines are other output (our previous commands and responses),
+    # so skip those.
+    initial_pcode = "\n".join(lines[7:decomp_cmd_idx]).encode("utf-8")
 
-    decomp.sendline(b"print raw")
-    decomp.readline()
-    final_pcode = decomp.readuntil(b"\n[decomp]> ").rstrip(b"\n[decomp]> ")
+    # The line after the decomp_cmd_idx is "Decompiling {func_name}", which we
+    # don't want in our output
+    decomp_log = "\n".join(lines[decomp_cmd_idx + 2:decomp_end_idx]).encode("utf-8").split(b"\n\n")
 
     return initial_pcode, decomp_log
 

@@ -1,4 +1,3 @@
-import pwnlib.tubes
 from PySide6 import QtWidgets, QtGui, QtCore
 
 import sys
@@ -112,18 +111,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _do_load_decomp_data(self):
 
-        env_vars = {"SLEIGHHOME": self.ghidra_dir}
+        decomp = None
 
         try:
-            with pwnlib.tubes.process.process(self.decomp_dbg_path, env=env_vars) as p:
-                # Read past the first input prompt
-                p.readuntil(b"[decomp]> ")
-
-                initial_pcode, data = get_decompile_data(
-                    p, self.xml_path, self.xml_func_name
-                )
-
-            decomp = None
+            initial_pcode, data = get_decompile_data(
+                self.decomp_dbg_path, self.ghidra_dir, self.xml_path, self.xml_func_name
+            )
 
             decomp = Decomp(initial_pcode)
             for i, rule in enumerate(data):

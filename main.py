@@ -18,10 +18,14 @@ class MainWindow(QtWidgets.QMainWindow):
     xml_func_name: str = ""
     xml_path: str = ""
     ghidra_dir: str = ""
-
+    decomp_dbg_path: str = ""
     decomp: typing.Optional[Decomp] = None
+    settings: QtCore.QSettings
+
     graph_view: GraphView
-    decomp_step: int = 0
+    list_widget: QtWidgets.QListWidget
+    text_edit: QtWidgets.QTextEdit
+    thread_manager: QtCore.QThreadPool
 
     def __init__(self):
         super().__init__()
@@ -57,6 +61,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thread_manager = QtCore.QThreadPool(self)
         self.load_data_done.connect(self._process_load_decomp_data)
 
+        # Initialise settings ini, and load the ghidra dir
+        self.settings = QtCore.QSettings("settings.ini", QtCore.QSettings.IniFormat)
+        dir_value = self.settings.value("ghidra_dir")
+        if dir_value is not None and not self._try_set_ghidra_dir(dir_value):
+            # dir is invalid, reset ini
+            self.settings.setValue("ghidra_dir", self.ghidra_dir)
+
         L = QtWidgets.QGridLayout(self)
         L.addWidget(self.text_edit, 0, 0)
         L.addWidget(self.graph_view, 0, 1, 2, 1)
@@ -68,6 +79,25 @@ class MainWindow(QtWidgets.QMainWindow):
         L.setRowStretch(1, 3)
 
         main_widget.setLayout(L)
+
+    def _try_set_ghidra_dir(self, ghidra_dir: str) -> bool:
+        """
+        Try to set the Ghidra folder. If this fails (because the folder does
+        not exist or because it does not contain the decomp_dbg executable), False
+        is returned. Otherwise, the 'ghidra_dir' and 'decomp_dbg_path' variables
+        are set and True is returned.
+        """
+        debug_path = os.path.join(ghidra_dir, self.decomp_dbg_suffix)
+
+        if not os.path.isfile(debug_path):  # invalid path
+            return False
+
+        self.ghidra_dir = ghidra_dir
+        self.decomp_dbg_path = debug_path
+
+        self.settings.setValue("ghidra_dir", self.ghidra_dir)
+
+        return True
 
     def _handle_set_xml_file(self):
         """
@@ -101,13 +131,8 @@ class MainWindow(QtWidgets.QMainWindow):
             if ghidra_dir == "":  # No folder was selected
                 return
 
-            debug_path = os.path.join(ghidra_dir, self.decomp_dbg_suffix)
-
-            if os.path.isfile(debug_path):
-                break
-
-        self.ghidra_dir = ghidra_dir
-        self.decomp_dbg_path = debug_path
+            if self._try_set_ghidra_dir(ghidra_dir):
+                return
 
     def _do_load_decomp_data(self):
 

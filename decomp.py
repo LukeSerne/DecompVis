@@ -6,6 +6,7 @@ import copy
 
 from util import Operation, Identifier, AddrSpace, InstructionReference
 
+
 class DecompStep:
     _lines: bytes
     _id: int
@@ -23,7 +24,7 @@ class DecompStep:
         top_line_parts = lines[0].split(b" ", 2)
         assert top_line_parts[0] == b"DEBUG", top_line_parts
         self._id = int(top_line_parts[1].rstrip(b":"))
-        self._rule_name = top_line_parts[2].decode('utf-8')
+        self._rule_name = top_line_parts[2].decode("utf-8")
 
         self._changes = []
         for change_line_num in range((len(lines) - 1) // 2):
@@ -32,17 +33,22 @@ class DecompStep:
             self._changes.append((old_line, new_line))
 
     def __str__(self) -> str:
-        return f"DecompStep {self.get_short_desc()}\nChanges:\n  " + "\n  ".join(["\n    ->\n  ".join(map(str, c)) for c in self._changes]) + f"\n{self._lines.decode('utf-8')}"
+        return (
+            f"DecompStep {self.get_short_desc()}\nChanges:\n  "
+            + "\n  ".join(["\n    ->\n  ".join(map(str, c)) for c in self._changes])
+            + f"\n{self._lines.decode('utf-8')}"
+        )
 
     def get_short_desc(self) -> str:
         return f"{self._id} (rule: {self._rule_name!r})"
+
 
 class DecompState:
     # Represents the state of the data flow graph at a specific point in the
     # decompilation process
     _state: networkx.DiGraph
 
-    def __init__(self, prev_state: typing.Optional['DecompState'] = None):
+    def __init__(self, prev_state: typing.Optional["DecompState"] = None):
         if prev_state is not None:
             self._state = prev_state.get_graph().copy()
         else:
@@ -51,7 +57,9 @@ class DecompState:
     def set_state(self, operations: list[Operation]):
         # Create a data flow graph out of the given operations
 
-        edges_to_create: list[tuple[str | Identifier | AddrSpace, str | Identifier | Operation]] = []
+        edges_to_create: list[
+            tuple[str | Identifier | AddrSpace, str | Identifier | Operation]
+        ] = []
 
         for op in operations:
             # Add node
@@ -69,7 +77,9 @@ class DecompState:
 
             # Add input edges (and varnodes if necessary)
             for inp in op._in:
-                if inp is None: continue  # BUG?
+                if inp is None:
+                    continue  # BUG?
+
                 assert isinstance(inp, (Identifier, AddrSpace, InstructionReference)), (type(inp), inp)
 
                 if isinstance(inp, InstructionReference):
@@ -98,14 +108,20 @@ class DecompState:
                 for in_varnode in self._state.predecessors(old_line._addr):
                     assert self._state.has_node(in_varnode), (in_varnode, "not a node")
 
-                    if self._state.in_degree(in_varnode) == 0 and self._state.out_degree(in_varnode) == 1:
+                    if (
+                        self._state.in_degree(in_varnode) == 0
+                        and self._state.out_degree(in_varnode) == 1
+                    ):
                         nodes_to_remove.append(in_varnode)
 
                 # Remove output nodes that don't flow any further
                 for out_varnode in self._state.successors(old_line._addr):
                     assert self._state.has_node(out_varnode), (out_varnode, "not a node")
 
-                    if self._state.out_degree(out_varnode) == 0 and self._state.in_degree(out_varnode) == 1:
+                    if (
+                        self._state.out_degree(out_varnode) == 0
+                        and self._state.in_degree(out_varnode) == 1
+                    ):
                         nodes_to_remove.append(out_varnode)
 
                 # print("Removing nodes " + str(nodes_to_remove))
@@ -127,7 +143,8 @@ class DecompState:
                     self._state.add_edge(new_line._addr, out_node)
 
                 for inp in new_line._in:
-                    if inp is None: continue  # BUG?
+                    if inp is None:
+                        continue  # BUG?
                     assert isinstance(inp, (Identifier, AddrSpace, InstructionReference)), (type(inp), inp)
 
                     if inp not in self._state:
@@ -137,6 +154,7 @@ class DecompState:
 
     def get_graph(self) -> networkx.DiGraph:
         return self._state
+
 
 class Decomp:
     _steps: list[DecompStep]

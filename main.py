@@ -9,6 +9,7 @@ from util import get_decompile_data
 from decomp import Decomp, DecompStep
 from ui import GraphView
 
+
 class MainWindow(QtWidgets.QMainWindow):
     decomp_dbg_suffix: str = os.path.join(
         "Ghidra", "Features", "Decompiler", "src", "decompile", "cpp", "decomp_dbg"
@@ -174,7 +175,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.graph_view.setEnabled(True)
 
     def load_decomp_data(self):
-        if self.ghidra_dir is None:
+        if self.ghidra_dir == "":
             # No Ghidra dir selected - don't load anything
             return
 

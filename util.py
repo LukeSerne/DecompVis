@@ -253,7 +253,7 @@ class Operation:
 
     @staticmethod
     def from_raw(line: bytes) -> "Operation":
-        full_line = line.decode('utf-8').strip(" ")
+        full_line = line.decode("utf-8").strip(" ")
 
         # eg. 0x800fb41c:22: u0x1000000d:1(0x800fb41c:22) = u0x10000012:1(0x800fb41c:61)
         parts = full_line.split(" ")
@@ -261,7 +261,7 @@ class Operation:
         addr = parts[0][:-1]
         num_parts = len(parts)
 
-        _in: list[Identifier | AddrSpace | InstructionReference | None] = []
+        _in: typing.Sequence[Identifier | AddrSpace | InstructionReference | None] = []
         _op: typing.Optional[str] = None
 
         # might be ** (empty)

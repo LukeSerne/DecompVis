@@ -69,7 +69,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # dir is invalid, reset ini
             self.settings.setValue("ghidra_dir", self.ghidra_dir)
 
-        L = QtWidgets.QGridLayout(self)
+        L = QtWidgets.QGridLayout(main_widget)
         L.addWidget(self.text_edit, 0, 0)
         L.addWidget(self.graph_view, 0, 1, 2, 1)
         L.addWidget(self.list_widget, 1, 0)
@@ -78,8 +78,6 @@ class MainWindow(QtWidgets.QMainWindow):
         L.setColumnStretch(1, 3)
         L.setRowStretch(0, 1)
         L.setRowStretch(1, 3)
-
-        main_widget.setLayout(L)
 
     def _try_set_ghidra_dir(self, ghidra_dir: str) -> bool:
         """

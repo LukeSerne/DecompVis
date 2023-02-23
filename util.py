@@ -25,10 +25,14 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
         capture_output=True, check=True, text=True
     ).stdout
 
+    # -1 is used as index to select the first element of the split if the
+    # function is not namespaced
+    bare_func_name = func_name.rsplit("::", 1)[-1]
+
     lines = output.split("\n")
     if not lines[1].startswith(f"{xml_path} successfully loaded: "):
         raise ValueError(f"Unexpected response to 'restore {xml_path}': {lines[1]!r}")
-    if not lines[3].startswith(f"Function {func_name}: "):
+    if not lines[3].startswith(f"Function {bare_func_name}: "):
         raise ValueError(f"Unexpected response to 'load function {func_name}': {lines[3]!r}")
     if lines[5] != "OK (1 ranges)":
         raise ValueError(f"Unexpected response to 'trace address': {lines[5]!r}")

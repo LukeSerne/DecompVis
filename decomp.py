@@ -79,17 +79,16 @@ class DecompState:
                 if inp is None:
                     continue  # BUG?
 
+                if inp not in self._state:
+                    self._state.add_node(inp, node_item=inp)
+
                 if isinstance(inp, InstructionReference):
-                    # Special case for instruction references - directly link
-                    # the operation being referenced to the current operation.
+                    # Special case for instruction references - Add extra edge
+                    # to reference target.
                     # TODO: Maybe make this a dotted line?
-                    edges_to_create.append((inp._target_addr, op))
+                    edges_to_create.append((inp._target_addr, inp))
 
-                else:
-                    if inp not in self._state:
-                        self._state.add_node(inp, node_item=inp)
-
-                    edges_to_create.append((inp, op._addr))
+                edges_to_create.append((inp, op._addr))
 
         self._state.add_edges_from(edges_to_create)
 
@@ -140,6 +139,12 @@ class DecompState:
 
                     if inp not in self._state:
                         self._state.add_node(inp, node_item=inp)
+
+                    if isinstance(inp, InstructionReference):
+                        # Special case for instruction references - Add extra edge
+                        # to reference target.
+                        # TODO: Maybe make this a dotted line?
+                        self._state.add_edge(inp._target_addr, inp)
 
                     self._state.add_edge(inp, new_line._addr)
 

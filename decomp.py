@@ -68,7 +68,6 @@ class DecompState:
             # Add output edge (and output varnode if it doesn't exist already)
             if op._out is not None:
                 out_node = op._out
-                assert isinstance(out_node, Identifier), (type(out_node), out_node)
 
                 if out_node not in self._state:
                     self._state.add_node(out_node, node_item=out_node)
@@ -79,8 +78,6 @@ class DecompState:
             for inp in op._in:
                 if inp is None:
                     continue  # BUG?
-
-                assert isinstance(inp, (Identifier, AddrSpace, InstructionReference)), (type(inp), inp)
 
                 if isinstance(inp, InstructionReference):
                     # Special case for instruction references - directly link
@@ -106,8 +103,6 @@ class DecompState:
 
                 # Remove nodes that point into only this node
                 for in_varnode in self._state.predecessors(old_line._addr):
-                    assert self._state.has_node(in_varnode), (in_varnode, "not a node")
-
                     if (
                         self._state.in_degree(in_varnode) == 0
                         and self._state.out_degree(in_varnode) == 1
@@ -116,8 +111,6 @@ class DecompState:
 
                 # Remove output nodes that don't flow any further
                 for out_varnode in self._state.successors(old_line._addr):
-                    assert self._state.has_node(out_varnode), (out_varnode, "not a node")
-
                     if (
                         self._state.out_degree(out_varnode) == 0
                         and self._state.in_degree(out_varnode) == 1
@@ -135,7 +128,6 @@ class DecompState:
                 # Add new edges
                 if new_line._out is not None:
                     out_node = new_line._out
-                    assert isinstance(out_node, Identifier), (type(out_node), out_node)
 
                     if out_node not in self._state:
                         self._state.add_node(out_node, node_item=out_node)
@@ -145,7 +137,6 @@ class DecompState:
                 for inp in new_line._in:
                     if inp is None:
                         continue  # BUG?
-                    assert isinstance(inp, (Identifier, AddrSpace, InstructionReference)), (type(inp), inp)
 
                     if inp not in self._state:
                         self._state.add_node(inp, node_item=inp)

@@ -4,6 +4,7 @@ import sys
 import os
 import traceback
 import typing
+import xml.etree.ElementTree
 
 from util import get_decompile_data
 from decomp import Decomp, DecompStep
@@ -109,15 +110,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.xml_path = file_name
 
-        # TODO: This is a hacky way to extract the function name that doesn't
-        # work when the specified xml file is generated from a function that is
-        # part of a class.
-        with open(self.xml_path, "r", encoding="utf-8") as f:
-            line = f.readline()
+        xml_data = xml.etree.ElementTree.parse(self.xml_path)
+        xml_root = xml_data.getroot()
 
-        assert line.startswith('<xml_savefile name="')
+        func_name = xml_root.get("name")
+        if func_name is None:
+            raise ValueError("No function name")
 
-        self.xml_func_name = line.split('"')[1]
+        if "::" in func_name:
+            raise ValueError(f"Function names containing '::' are not supported by the decompiler ({func_name!r})")
+
+        for scope in xml_root.findall("./save_state/db/scope"):
+            if scope.find(f"./symbollist/mapsym/function[@name={func_name!r}]") is None:
+                continue
+
+            # found the function
+            scope_name = scope.get("name")
+            break
+        else:
+            raise ValueError(f"No function definition found for function {func_name!r}")
+
+        if scope_name is None:
+            raise ValueError(f"Scope containing function has no name attribute")
+
+        if scope_name != "":
+            func_name = f"{scope_name}::{func_name}"
+
+        self.xml_func_name = func_name
         self.load_decomp_data()
 
     def _handle_set_ghidra_dir(self):

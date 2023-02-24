@@ -155,6 +155,7 @@ class DecompState:
 class Decomp:
     _steps: list[DecompStep]
     _states: list[DecompState]
+    _last_loaded_state: int
 
     def __init__(self, initial_pcode: bytes):
         self._steps = []
@@ -165,17 +166,10 @@ class Decomp:
             if b":" in line
         ])
         self._states = [initial_state]
+        self._last_loaded_state = 0
 
     def add_step(self, step: DecompStep):
         self._steps.append(step)
-
-        if not self._states:
-            new_state = DecompState()
-        else:
-            new_state = DecompState(self._states[-1])
-
-        new_state.apply(step)
-        self._states.append(new_state)
 
     def get_step(self, index: int) -> DecompStep:
         return self._steps[index]
@@ -184,4 +178,10 @@ class Decomp:
         return len(self._steps)
 
     def get_state(self, idx: int) -> DecompState:
+        for i in range(self._last_loaded_state, idx + 1):
+            new_state = DecompState(self._states[-1])
+            new_state.apply(self._steps[i])
+            self._states.append(new_state)
+
+        self._last_loaded_state = len(self._states)
         return self._states[idx]

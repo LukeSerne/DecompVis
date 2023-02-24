@@ -485,8 +485,9 @@ class Operation:
         # here:
         # https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/GhidraDocs/languages/html/pseudo-ops.html
 
-        # USERDEFINED is also a pseudo P-CODE op, but I have no clue what its
-        # ::printRaw function outputs, so I don't parse it.
+        # USERDEFINED is also a pseudo P-CODE op, but its ::printRaw method can
+        # output pretty much anything, so it's much harder to parse. I just
+        # assume it is the only thing that reaches here that has only 2 parts.
 
         if parts[1].startswith("cpoolref_") or (num_parts >= 4 and parts[3].startswith("cpoolref_")):  # TypeOpCpoolref
             # Retrieves a constant from the constant pool
@@ -520,6 +521,13 @@ class Operation:
 
             return Operation(full_line, addr, False, _op, _in, _out)
 
+        if num_parts == 2:
+            # A user-defined operation. Pretend it's an empty line
+            print(f"Ignoring user-defined operation: {parts[1]!r}")
+            return Operation(full_line, addr, True, "", _in, None)
+
+        assert num_parts > 2 and parts[2] == "=", parts
+
         # MULTIEQUAL, INDIRECT, PTRADD, PTRSUB, CAST and INSERT are 'Additional
         # P-CODE Operations' and are documented here:
         # https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/GhidraDocs/languages/html/additionalpcode.html
@@ -528,7 +536,6 @@ class Operation:
         # it seem like one. For the same reason, INSERT is parsed like a
         # TypeOpFunc.
 
-        assert parts[2] == "=", parts
         _out = Identifier.from_raw(parts[1])
 
         if num_parts >= 6 and parts[4] == "?" and num_parts % 2 == 0:  # TypeOpMulti

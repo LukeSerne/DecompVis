@@ -62,7 +62,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(main_widget)
 
         self.list_widget = QtWidgets.QListWidget(main_widget)
-        self.list_widget.addItem("None")
         self.list_widget.currentRowChanged.connect(self.handle_list_change)
 
         self.text_edit = QtWidgets.QTextEdit(main_widget)

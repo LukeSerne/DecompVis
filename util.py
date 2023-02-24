@@ -1,6 +1,7 @@
 import subprocess
 from dataclasses import dataclass
 import typing
+import traceback
 
 def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str) -> tuple[bytes, list[bytes]]:
     """
@@ -114,7 +115,7 @@ class Identifier:
         # base:
         # <reg>
         # <reg>\+\d+
-        # []<storage_location>
+        # <space_shortcut><storage_location>
 
         # suffices:
         # :<size>   <- if the size is unexpected
@@ -125,9 +126,7 @@ class Identifier:
 
         # First remove suffices:
         while name.endswith(")"):
-            start_idx = name.rfind("(")
-            assert name[start_idx] == "("
-
+            start_idx = find_matching_open_paren_to_final_close_paren(name)
             part = name[start_idx:]
 
             if part == "(i)":
@@ -139,12 +138,18 @@ class Identifier:
                 is_written = True
                 seq_num = tuple(map(lambda s: int(s, 16), part[1:-1].split(":")))
             else:
-                # part might be "(#0x6)"
+                # part might be:
+                # - "(#0x6)" or
+                # - "(u0x1000000e:1(0x02a42310:99c))" or
+                # - "(r3(i))"
                 # Optional function arg?? Ignore these for now.
                 # TODO: Figure out when these args are printed and decide how to
                 # parse them
-                if not part.startswith("(#"):
+                try:
+                    Identifier.from_raw(part[1:-1])
+                except:
                     print(f"Unexpected parenthesised group at the end of varnode: {name!r}")
+                    traceback.format_exc()
 
             name = name[:start_idx]
 
@@ -156,6 +161,8 @@ class Identifier:
             try:
                 size = int(size_)
             except ValueError:
+                # This was probably a function name / storage location with a
+                # colon in it.
                 pass
 
         if size is None:
@@ -199,14 +206,20 @@ class Identifier:
         if self._size != other._size: return False
         if self._is_input != other._is_input: return False
         if self._is_written != other._is_written: return False
-        if self._is_written and not self._is_input and self._seq_num != other._seq_num: return False
+        # HACK: Only comparing self._seq_num[0] because the diffs don't tell us
+        # when the 'time' (self._seq_num[1]) of an identifier is changed.
+        # Issue: https://github.com/NationalSecurityAgency/ghidra/issues/4963
+        if self._is_written and not self._is_input and self._seq_num[0] != other._seq_num[0]: return False
 
         return True
 
     def __hash__(self) -> int:
+        # HACK: Only using self._seq_num[0] because the diffs don't tell us
+        # when the 'time' (self._seq_num[1]) of an identifier is changed.
+        # Issue: https://github.com/NationalSecurityAgency/ghidra/issues/4963
         return (
             self._space_shortcut, self._name, self._size, self._is_input,
-            self._is_written, self._seq_num if self._is_written and not self._is_input else -1
+            self._is_written, self._seq_num[0] if self._is_written and not self._is_input else -1
         ).__hash__()
 
     def __str__(self) -> str:

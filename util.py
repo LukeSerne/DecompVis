@@ -1,3 +1,5 @@
+import networkx
+
 import subprocess
 from dataclasses import dataclass
 import typing
@@ -70,6 +72,93 @@ def find_matching_open_paren_to_final_close_paren(string: str) -> int:
         raise ValueError(f"Input string was not balanced! {string!r}")
 
     return len(string) - 1 - i
+
+def grid_cell_position(G: networkx.DiGraph) -> tuple[dict["Node", tuple[float, float]], list[float]]:
+    """
+    Assuming the graph is directed and acyclic, this will return the positions
+    to plot the graph in a hierarchical layout. The edges will point downwards
+    as much as possible.
+
+    G: the graph (must not have a cycle)
+    """
+    # TODO: Sometimes, edges are horizontal or point upwards. This happens when
+    # a node is connected to multiple sinks and the distance of the node to the
+    # first sink is smaller than the distance of the node to a later sink.
+    # TODO: The order of the parents of a node doesn't correspond to the order
+    # of the inputs to an operation.
+    # TODO: Sometimes the super-tree of one parent uses multiple columns,
+    # displacing the super-tree of another parent. Since the other parent's
+    # super-tree is laid out in the columns to the right of the first parent,
+    # there can be a needlessly big gap between the super-trees of the parents.
+    # This is especially pronounced when the super-tree of the first parent is
+    # much larger than the super-tree of the second parent.
+
+    # Go through all parents, assign them their own columns and recursively
+    # process them.
+    def f(data: dict, sink: "Node", column_id: float, column_width: float, row_id: int) -> dict:
+        nonlocal G
+
+        # Set data for sink
+        data[sink] = (column_id, row_id)
+        parents = tuple(G.predecessors(sink))
+
+        if not parents:
+            # No parents -> end
+            return data
+
+        num_parents = len(parents)
+        parent_width = column_width / num_parents
+
+        # Pick new column ids
+        column_idx = 0
+        for parent in parents:
+            if parent in data:  # The parent has already been placed in the grid
+                continue
+
+            parent_col_id = column_id + parent_width * column_idx
+            assert column_id <= parent_col_id < column_id + parent_width * (column_idx + 1), (column_idx, column_id, parent_width, parent_col_id)
+
+            data = f(data, parent, parent_col_id, parent_width, row_id - 1)
+            column_idx += 1
+
+        return data
+
+    # Find the sink
+    sinks = [node for node, out_deg in G.out_degree() if out_deg == 0]
+    pos_data = {}
+
+    for i, sink in enumerate(sinks):
+        pos_data = f(pos_data, sink, i * 1000, 1000, 0)
+
+    columns = sorted(set(pos_data[x][0] for x in pos_data))
+    return pos_data, columns
+
+def layout_algorithm(graph: networkx.DiGraph) -> dict["Node", tuple[float, float]]:
+    """
+    Takes a directed graph and returns a mapping of nodes to their position in
+    the final layout.
+    """
+    # In general, the graph consists of several disconnected directed, acyclic
+    # graphs. To find an good layout, we will separate these components and find
+    # a layout for each component individually. Finally, we combine these
+    # layouts into a single layout.
+    layout = {}
+    num_columns = 0
+
+    column_width = 100  # width of a single column
+    row_height = 100  # height of a cell
+
+    for group_nodes in networkx.weakly_connected_components(graph):
+        group = graph.subgraph(group_nodes)
+        group_layout, group_columns = grid_cell_position(group)
+
+        # Now turn the column and row ids into actual (x, y) positions
+        for node, (col_id, row_id) in group_layout.items():
+            layout[node] = ((num_columns + group_columns.index(col_id)) * column_width, row_id * row_height)
+
+        num_columns += len(group_columns)
+
+    return layout
 
 @dataclass(frozen=True)
 class AddrSpace:

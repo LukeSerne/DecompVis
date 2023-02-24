@@ -23,7 +23,7 @@ import networkx
 import math
 import typing
 
-from util import Operation
+from util import Operation, layout_algorithm
 
 
 class Node(QGraphicsObject):
@@ -308,18 +308,14 @@ class GraphView(QGraphicsView):
             self.set_pos()
 
     def set_pos(self):
-        """Set start position of nodes"""
+        """Set the position of nodes"""
         # Compute node position from layout function
-        # TODO: Use a different layout function that is better suited to the
-        # type of graphs that the decompiler produces.
-        positions = networkx.circular_layout(self._graph)
+        positions = layout_algorithm(self._graph)
         num_items = len(positions)
 
         # Change position of all nodes
         for node, pos in positions.items():
             x, y = pos
-            x *= self._graph_scale * num_items
-            y *= self._graph_scale * num_items
             item, _ = self._nodes_map[node]
             item.setPos(x, y)
 

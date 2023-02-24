@@ -8,6 +8,7 @@ from PySide6.QtGui import (
     QFontMetricsF,
     QFont,
     QPainterPath,
+    QTransform,
 )
 from PySide6.QtWidgets import (
     QGraphicsItem,
@@ -351,3 +352,20 @@ class GraphView(QGraphicsView):
                 slots = 1
 
             self.scene().addItem(Edge(source, dest, offset, slots))
+
+    def set_zoom(self, zoom_scale: float, *, cursor_is_center: bool = False):
+        """
+        Set the zoom to a specific level
+        """
+
+        transform = QTransform()
+        transform.scale(zoom_scale, zoom_scale)
+
+        if cursor_is_center:
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+
+        self.setTransform(transform)
+
+        if cursor_is_center:
+            # (reset back to original transformation anchor)
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)

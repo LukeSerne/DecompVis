@@ -23,6 +23,7 @@ class MainWindow(QtWidgets.QMainWindow):
     decomp_dbg_path: str = ""
     decomp: typing.Optional[Decomp] = None
     settings: QtCore.QSettings
+    zoom: float = 1.0
 
     graph_view: GraphView
     list_widget: QtWidgets.QListWidget
@@ -45,6 +46,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         file_menu.addAction(load_xml_act)
         file_menu.addAction(set_ghidra_dir_act)
+
+        view_menu = menu_bar.addMenu("&View")
+
+        zoom_in_act = QtGui.QAction("Zoom In", self)
+        zoom_in_act.triggered.connect(self._handle_zoom_in)
+        zoom_out_act = QtGui.QAction("Zoom Out", self)
+        zoom_out_act.triggered.connect(self._handle_zoom_out)
+
+        view_menu.addAction(zoom_in_act)
+        view_menu.addAction(zoom_out_act)
 
         # Create main widget
         main_widget = QtWidgets.QWidget()
@@ -151,6 +162,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if self._try_set_ghidra_dir(ghidra_dir):
                 return
+
+    def _handle_zoom_in(self):
+        self.zoom *= 2
+        self.graph_view.set_zoom(self.zoom)
+
+    def _handle_zoom_out(self):
+        self.zoom /= 2
+        self.graph_view.set_zoom(self.zoom)
 
     def _do_load_decomp_data(self):
 

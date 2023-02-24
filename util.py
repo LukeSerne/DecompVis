@@ -105,7 +105,7 @@ class Identifier:
     _is_input: bool = False
     _is_written: bool = False
     _size: typing.Optional[int] = None
-    _seq_num: typing.Optional[int] = None
+    _seq_num: typing.Optional[tuple[int, int]] = None
     _space_shortcut: str = ""
     _name: str = ""
 
@@ -117,7 +117,7 @@ class Identifier:
         # []<storage_location>
 
         # suffices:
-        # :<size>   <- if size unexpected
+        # :<size>   <- if the size is unexpected
         # (i)       <- if input
         # (seq_num) <- if isWritten
         # (free)    <- if insert or constant
@@ -134,13 +134,17 @@ class Identifier:
                 is_input = True
             elif part == "(free)":
                 is_free = True
-            else:
-                if not part[1:].startswith("0x"):
-                    print(name)
-                    break
-
+            elif part.startswith("(0x"):
+                # part might be "(0x800fb41c:61)"
                 is_written = True
-                seq_num = int(part[1:-1].split(":", 1)[0], 16)  # e.g. 0x800fb41c:61
+                seq_num = tuple(map(lambda s: int(s, 16), part[1:-1].split(":")))
+            else:
+                # part might be "(#0x6)"
+                # Optional function arg?? Ignore these for now.
+                # TODO: Figure out when these args are printed and decide how to
+                # parse them
+                if not part.startswith("(#"):
+                    print(f"Unexpected parenthesised group at the end of varnode: {name!r}")
 
             name = name[:start_idx]
 
@@ -168,12 +172,12 @@ class Identifier:
             # name == "invalid_addr"
             # name == "0x{offset:0{size}x}"
             # name == "0x{offset:0{size}x}+{\d+}"
-            # name == "<function_name>"
             name = name[1:]
         else:
-            # register
+            # register / function name
             # name == "{reg}+{\d+}"
             # name == "{reg}"
+            # name == "f{function_name}"
             space_shortcut = "%"  # add '%' shortcut for consistency
             name = name
 
@@ -188,7 +192,7 @@ class Identifier:
         """
         if not isinstance(other, Identifier): return NotImplemented
         if self is other: return True
-        if self._space_shortcut == "#": return False  # Constants are always different
+        if self._space_shortcut == "#": return False  # Constants are always unique
 
         if self._space_shortcut != other._space_shortcut: return False
         if self._name != other._name: return False

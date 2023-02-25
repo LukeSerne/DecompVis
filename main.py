@@ -22,6 +22,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ghidra_dir: str = ""
     decomp_dbg_path: str = ""
     decomp: typing.Optional[Decomp] = None
+    initial_pcode: str = ""
     settings: QtCore.QSettings
     zoom: float = 1.0
 
@@ -193,8 +194,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _process_load_decomp_data(self, decomp: Decomp, initial_pcode: str):
         self.decomp = decomp
-
-        self.text_edit.setPlainText(initial_pcode)
+        self.initial_pcode = initial_pcode
 
         self.list_widget.clear()
         self.list_widget.addItems(
@@ -208,6 +208,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.list_widget.setEnabled(True)
         self.text_edit.setEnabled(True)
         self.graph_view.setEnabled(True)
+
+        self.handle_list_change(0)
 
     def load_decomp_data(self):
         if self.ghidra_dir == "":
@@ -225,12 +227,11 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         Handles the selected entry in the list changing
         """
-        if self.decomp is None:
-            # Happens when no XML is loaded
-            return
-
         self.graph_view.set_graph(self.decomp.get_state(new_index).get_graph())
-        if new_index != 0:
+
+        if new_index == 0:
+            self.text_edit.setPlainText(self.initial_pcode)
+        else:
             self.text_edit.setPlainText(str(self.decomp.get_step(new_index - 1)))
 
 

@@ -178,10 +178,10 @@ class Decomp:
         return len(self._steps)
 
     def get_state(self, idx: int) -> DecompState:
-        for i in range(self._last_loaded_state, idx + 1):
-            new_state = DecompState(self._states[-1])
+        for i in range(self._last_loaded_state, idx):
+            new_state = DecompState(self._states[i])
             new_state.apply(self._steps[i])
             self._states.append(new_state)
 
-        self._last_loaded_state = len(self._states)
+        self._last_loaded_state = len(self._states) - 1
         return self._states[idx]

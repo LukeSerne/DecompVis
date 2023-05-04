@@ -286,6 +286,7 @@ class GraphView(QGraphicsView):
         self._scene = QGraphicsScene()
         self.setScene(self._scene)
         self.setBackgroundBrush(QColor("white"))
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
         # Used to add space between nodes
         self._graph_scale = 10

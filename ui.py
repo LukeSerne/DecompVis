@@ -281,6 +281,7 @@ class GraphView(QGraphicsView):
         """
         super().__init__()
 
+        self._main_window = parent
         self._graph = graph
         self._scene = QGraphicsScene()
         self.setScene(self._scene)
@@ -348,6 +349,17 @@ class GraphView(QGraphicsView):
                 slots = 1
 
             self.scene().addItem(Edge(source, dest, offset, slots))
+
+    def wheelEvent(self, event):
+        """
+        Called whenever the mouse wheel is moved while the cursor is over the
+        graph view. This zooms the view in or out, depending on the direction of
+        the mouse wheel movement.
+        """
+        if event.angleDelta().y() > 0:
+            self._main_window._handle_zoom_in(cursor_is_center=True)
+        else:
+            self._main_window._handle_zoom_out(cursor_is_center=True)
 
     def set_zoom(self, zoom_scale: float, *, cursor_is_center: bool = False):
         """

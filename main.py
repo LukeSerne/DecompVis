@@ -16,6 +16,10 @@ class MainWindow(QtWidgets.QMainWindow):
         "Ghidra", "Features", "Decompiler", "src", "decompile", "cpp", "decomp_dbg"
     )
     load_data_done: QtCore.Signal = QtCore.Signal(Decomp, str)
+    zoom_levels: tuple[float] = (
+        0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7,
+        0.75, 0.85, 0.9, 0.95, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0,
+    )
 
     xml_func_name: str = ""
     xml_path: str = ""
@@ -24,7 +28,7 @@ class MainWindow(QtWidgets.QMainWindow):
     decomp: typing.Optional[Decomp] = None
     initial_pcode: str = ""
     settings: QtCore.QSettings
-    zoom: float = 1.0
+    zoom_idx: int = zoom_levels.index(1.0)
 
     graph_view: GraphView
     list_widget: QtWidgets.QListWidget
@@ -68,7 +72,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.text_edit = QtWidgets.QTextEdit(main_widget)
         self.text_edit.setReadOnly(True)
 
-        self.graph_view = GraphView(None)
+        self.graph_view = GraphView(None, self)
 
         # Setup things for threading
         self.thread_manager = QtCore.QThreadPool(self)
@@ -163,13 +167,13 @@ class MainWindow(QtWidgets.QMainWindow):
             if self._try_set_ghidra_dir(ghidra_dir):
                 return
 
-    def _handle_zoom_in(self):
-        self.zoom *= 2
-        self.graph_view.set_zoom(self.zoom)
+    def _handle_zoom_in(self, cursor_is_center: bool = False):
+        self.zoom_idx = min(self.zoom_idx + 1, len(self.zoom_levels) - 1)
+        self.graph_view.set_zoom(self.zoom_levels[self.zoom_idx], cursor_is_center=cursor_is_center)
 
-    def _handle_zoom_out(self):
-        self.zoom /= 2
-        self.graph_view.set_zoom(self.zoom)
+    def _handle_zoom_out(self, cursor_is_center: bool = False):
+        self.zoom_idx = max(self.zoom_idx - 1, 0)
+        self.graph_view.set_zoom(self.zoom_levels[self.zoom_idx], cursor_is_center=cursor_is_center)
 
     def _do_load_decomp_data(self):
 

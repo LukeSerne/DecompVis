@@ -1,2 +1,2 @@
 networkx==2.2.8
-PySide6==6.4.2
+PySide6==6.5.0

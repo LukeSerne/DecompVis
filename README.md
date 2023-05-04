@@ -11,14 +11,14 @@ Unfortunately, Ghidra provides no easy way to observe the process of transformin
 ## Usage
 1. Install the dependencies using `python -m pip -r requirements.txt`.
 1. Open the application using `python main.py`.
-1. In the UI, click `File > Set Ghidra folder` and select the folder in which you installed Ghidra. Make sure that a subfolder of this folder contains the `decomp_dbg` executable.
+1. In the UI, click `File > Set Ghidra folder` and select the folder in which you installed Ghidra. Relative to this folder, there should be a file in the following path: `./Ghidra/Features/Decompiler/src/decompile/cpp/decomp_dbg`. If there isn't, follow the instructions at "Obtaining `decomp_dbg`". If you have set this path, it will be saved in a settings file (`settings.ini`) so you don't need to set it every time you open the application.
 1. In the UI, click `File > Load XML file` and select an `.xml` file produced by Ghidra using the "Debug Function Decompilation" option.
 
 ## Obtaining `decomp_dbg`
 First, the `decomp_dbg` executable needs to be built. This only needs to be done once (or whenever the decompiler changes) and can be done using these steps:
 
-1. Go to your ghidra folder, which I will denote using `$SLEIGHHOME`.
-1. Go to `$SLEIGHHOME/Ghidra/Features/Decompiler/src/decompile/cpp`.
+1. Go to the folder in which you installed ghidra.
+1. Go to `./Ghidra/Features/Decompiler/src/decompile/cpp`.
 1. Run `make decomp_dbg`.
 
 After the last command has completed, an executable called `decomp_dbg` should have been created in the folder. Once you have this, you can start using DecompVis.
@@ -29,10 +29,10 @@ Currently, this project has several limitations, which future commits will (hope
 1. **Rendering Performance**. Perhaps the biggest limitation lies in the performance of rendering the reconstructed data flow graph. The more instructions the initial assembly has, the larger the reconstructed data flow graph. As such, it is advisable to try to limit the size of the functions that are fed into the program as much as possible.
 1. **Inaccurate Data Flow Graph Reconstruction - Incomplete Graph**
 The intermediate graphs that this program produces are generated based on a diff that the `decomp_dbg` program provides for every intermediate step. However, it seems that these diffs are incomplete. This causes some nodes to not be connected, which leads to an inaccurate reconstructed data flow graph. An issue (NationalSecurityAgency/ghidra#4963) has been created to resolve this problem in Ghidra. Until this issue is resolved, this program uses a workaround, where the sequence number (the `10` in `0x800e2e58:10`) of addresses is ignored.
-1. **Inaccurate Data Flow Graph Reconstruction - Ambiguous Operators**. The format used by `decomp_dbg` to print the P-CODE is ambiguous for various common operations (for example, the `*` symbol can denote both `INT_MULT` and `FLOAT_MULT`). This is undesirable, because for proper understanding of the data flow graph, it is necessary to know exactly which P-CODE operations are present. Since this limitation is caused by Ghidra, an issue (NationalSecurityAgency/ghidra#4951) has been created to resolve these ambiguities. Until this issue is resolved, this program supports alternative, unofficial operators. These are shown in the table below.
+1. **Inaccurate Data Flow Graph Reconstruction - Ambiguous Operators**. The format used by `decomp_dbg` to print the P-CODE is ambiguous for various common operations (for example, the `*` symbol can denote both `INT_MULT` and `FLOAT_MULT`). This is undesirable, because for proper understanding of the data flow graph, it is necessary to know exactly which P-CODE operations are present. Since this limitation is caused by Ghidra, a PR (NationalSecurityAgency/ghidra#5063) has been created to resolve these ambiguities. Until this issue is resolved, this program supports alternative, unofficial operators. These are shown in the table below.
 
 ## Unofficial operators
-The table below contains all (10) ambiguous operators that are printed by `::printRaw`, as well as several unofficial operators that would be used to uniquely identify the ambiguous operations.
+The table below contains all (10) ambiguous operators that are printed by `TypeOp::printRaw`, as well as several unofficial operators that would be used to uniquely identify the ambiguous operations.
 
 Operator        | Operation
 ---             | ---

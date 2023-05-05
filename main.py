@@ -8,7 +8,7 @@ import xml.etree.ElementTree
 
 from util import get_decompile_data
 from decomp import Decomp, DecompStep
-from ui import GraphView
+from ui import GraphView, ZoomSliderWidget
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -73,6 +73,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.text_edit.setReadOnly(True)
 
         self.graph_view = GraphView(None, self)
+
+        # Add a zoom slider to the status bar
+        self.zoom_slider = ZoomSliderWidget(len(self.zoom_levels), self.zoom_levels.index(1.0), self)
+        self.statusBar().addPermanentWidget(self.zoom_slider)
 
         # Setup things for threading
         self.thread_manager = QtCore.QThreadPool(self)
@@ -171,24 +175,27 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.zoom_idx == len(self.zoom_levels) - 1:  # already fully zoomed in
             return
 
-        self.zoom_idx += 1
-        self._handle_update_zoom(cursor_is_center)
+        self._handle_update_zoom(self.zoom_idx + 1, cursor_is_center)
 
     def _handle_zoom_out(self, cursor_is_center: bool = False):
         if self.zoom_idx == 0:  # already fully zoomed out
             return
 
-        self.zoom_idx -= 1
-        self._handle_update_zoom(cursor_is_center)
+        self._handle_update_zoom(self.zoom_idx - 1, cursor_is_center)
 
-    def _handle_update_zoom(self, cursor_is_center: bool = False):
+    def _handle_update_zoom(self, new_zoom_idx: int, cursor_is_center: bool = False):
         """
         Updates the graph view to have the correct zoom corresponding to
-        'self.zoom_idx'. Also enables and disables the menu actions accordingly.
+        'new_zoom_idx'. Also enables and disables the menu actions accordingly.
+        This function assumes 'new_zoom_idx' is a valid index in
+        MainWindow.zoom_levels.
         """
-        self.graph_view.set_zoom(self.zoom_levels[self.zoom_idx], cursor_is_center=cursor_is_center)
-        self.zoom_in_act.setEnabled(self.zoom_idx != len(self.zoom_levels) - 1)
-        self.zoom_out_act.setEnabled(self.zoom_idx != 0)
+        self.zoom_idx = new_zoom_idx
+
+        self.graph_view.set_zoom(self.zoom_levels[new_zoom_idx], cursor_is_center=cursor_is_center)
+        self.zoom_in_act.setEnabled(new_zoom_idx != len(self.zoom_levels) - 1)
+        self.zoom_out_act.setEnabled(new_zoom_idx != 0)
+        self.zoom_slider.set_zoom_level(new_zoom_idx)
 
     def _do_load_decomp_data(self):
 
@@ -228,8 +235,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.text_edit.setEnabled(True)
         self.graph_view.setEnabled(True)
 
-        self.zoom_idx = self.zoom_levels.index(1.0)
-        self._handle_update_zoom()
+        self._handle_update_zoom(self.zoom_levels.index(1.0))
         self.handle_list_change(0)
 
     def load_decomp_data(self):

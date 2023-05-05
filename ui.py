@@ -16,6 +16,9 @@ from PySide6.QtWidgets import (
     QGraphicsScene,
     QGraphicsView,
     QStyleOptionGraphicsItem,
+    QHBoxLayout,
+    QPushButton,
+    QSlider,
     QWidget,
 )
 
@@ -378,3 +381,52 @@ class GraphView(QGraphicsView):
         if cursor_is_center:
             # (reset back to original transformation anchor)
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+
+class ZoomSliderWidget(QWidget):
+
+    def __init__(self, num_zoom_levels: int, initial_idx: int, parent: "MainWindow"):
+        """
+        Creates and initializes the widget
+        """
+        super().__init__()
+
+        self.parent = parent
+        self.num_zoom_levels = num_zoom_levels
+
+        self.slider = QSlider(Qt.Horizontal)
+        self.minus_button = QPushButton('-')
+        self.plus_button = QPushButton('+')
+
+        self.slider.setMinimum(0)
+        self.slider.setMaximum(num_zoom_levels - 1)
+        self.slider.setTickInterval(2)
+        self.slider.setTickPosition(QSlider.TicksAbove)
+        self.slider.setPageStep(1)
+        self.slider.setTracking(True)
+        self.slider.setSliderPosition(initial_idx)
+        self.slider.valueChanged.connect(self._handle_slider_moved)
+
+        self.minus_button.setFlat(True)
+        self.plus_button.setFlat(True)
+        self.minus_button.clicked.connect(parent._handle_zoom_out)
+        self.plus_button.clicked.connect(parent._handle_zoom_in)
+
+        layout = QHBoxLayout(self)
+        layout.addWidget(self.minus_button)
+        layout.addWidget(self.slider)
+        layout.addWidget(self.plus_button)
+
+    def _handle_slider_moved(self):
+        """
+        Handle the slider being moved - pass the new zoom index to the parent
+        """
+        self.parent._handle_update_zoom(self.slider.value())
+
+    def set_zoom_level(self, new_zoom_idx: int):
+        """
+        Sets the slider position to the given index and updates the buttons
+        accordingly.
+        """
+        self.slider.setSliderPosition(new_zoom_idx)
+        self.minus_button.setEnabled(new_zoom_idx > 0)
+        self.plus_button.setEnabled(new_zoom_idx < self.num_zoom_levels - 1)

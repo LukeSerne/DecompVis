@@ -54,13 +54,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         view_menu = menu_bar.addMenu("&View")
 
-        zoom_in_act = QtGui.QAction("Zoom In", self)
-        zoom_in_act.triggered.connect(self._handle_zoom_in)
-        zoom_out_act = QtGui.QAction("Zoom Out", self)
-        zoom_out_act.triggered.connect(self._handle_zoom_out)
+        self.zoom_in_act = QtGui.QAction("Zoom In", self)
+        self.zoom_in_act.triggered.connect(self._handle_zoom_in)
+        self.zoom_out_act = QtGui.QAction("Zoom Out", self)
+        self.zoom_out_act.triggered.connect(self._handle_zoom_out)
 
-        view_menu.addAction(zoom_in_act)
-        view_menu.addAction(zoom_out_act)
+        view_menu.addAction(self.zoom_in_act)
+        view_menu.addAction(self.zoom_out_act)
 
         # Create main widget
         main_widget = QtWidgets.QWidget()
@@ -184,9 +184,11 @@ class MainWindow(QtWidgets.QMainWindow):
     def _handle_update_zoom(self, cursor_is_center: bool = False):
         """
         Updates the graph view to have the correct zoom corresponding to
-        'self.zoom_idx'.
+        'self.zoom_idx'. Also enables and disables the menu actions accordingly.
         """
         self.graph_view.set_zoom(self.zoom_levels[self.zoom_idx], cursor_is_center=cursor_is_center)
+        self.zoom_in_act.setEnabled(self.zoom_idx != len(self.zoom_levels) - 1)
+        self.zoom_out_act.setEnabled(self.zoom_idx != 0)
 
     def _do_load_decomp_data(self):
 

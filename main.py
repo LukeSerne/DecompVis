@@ -168,11 +168,24 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
 
     def _handle_zoom_in(self, cursor_is_center: bool = False):
-        self.zoom_idx = min(self.zoom_idx + 1, len(self.zoom_levels) - 1)
-        self.graph_view.set_zoom(self.zoom_levels[self.zoom_idx], cursor_is_center=cursor_is_center)
+        if self.zoom_idx == len(self.zoom_levels) - 1:  # already fully zoomed in
+            return
+
+        self.zoom_idx += 1
+        self._handle_update_zoom(cursor_is_center)
 
     def _handle_zoom_out(self, cursor_is_center: bool = False):
-        self.zoom_idx = max(self.zoom_idx - 1, 0)
+        if self.zoom_idx == 0:  # already fully zoomed out
+            return
+
+        self.zoom_idx -= 1
+        self._handle_update_zoom(cursor_is_center)
+
+    def _handle_update_zoom(self, cursor_is_center: bool = False):
+        """
+        Updates the graph view to have the correct zoom corresponding to
+        'self.zoom_idx'.
+        """
         self.graph_view.set_zoom(self.zoom_levels[self.zoom_idx], cursor_is_center=cursor_is_center)
 
     def _do_load_decomp_data(self):
@@ -213,6 +226,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.text_edit.setEnabled(True)
         self.graph_view.setEnabled(True)
 
+        self.zoom_idx = self.zoom_levels.index(1.0)
+        self._handle_update_zoom()
         self.handle_list_change(0)
 
     def load_decomp_data(self):

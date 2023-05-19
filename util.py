@@ -4,14 +4,20 @@ import subprocess
 from dataclasses import dataclass
 import typing
 import traceback
+import itertools
 
-def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str, extrapaths: list[str]) -> tuple[bytes, list[bytes]]:
+def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str, extra_paths: list[str]) -> tuple[bytes, list[bytes]]:
     """
     Executes the decompiler on the given xml file and returns the P-CODE diffs
     and initial P-CODE.
     """
 
-    command = decomp_path + ''.join([(' -s ' + extrapath) for extrapath in extrapaths])
+    # Construct the full command, including extra paths for language
+    # definitions. The resulting command will be [decomp_path] if no extra_paths
+    # are given, and [decomp_path, '-s', path_1, '-s', path_2] if 2 extra_paths
+    # are given.
+    command_args = zip(['-s'] * len(extra_paths), extra_paths)
+    command = [decomp_path] + list(itertools.chain.from_iterable(command_args))
 
     # TODO: This converts str to bytes only for later functions (eg. Operation::from_raw)
     # to convert the bytes back to str. Consider just returning str from this
@@ -27,7 +33,7 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
     )
 
     output = subprocess.run(
-        command.split(' '), input=input_commands, env={"SLEIGHHOME": ghidra_path},
+        command, input=input_commands, env={"SLEIGHHOME": ghidra_path},
         capture_output=True, check=True, text=True
     ).stdout
 

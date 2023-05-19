@@ -14,6 +14,8 @@ Unfortunately, Ghidra provides no easy way to observe the process of transformin
 1. In the UI, click `File > Set Ghidra folder` and select the folder in which you installed Ghidra. Relative to this folder, there should be a file in the following path: `./Ghidra/Features/Decompiler/src/decompile/cpp/decomp_dbg`. If there isn't, follow the instructions at "Obtaining `decomp_dbg`". If you have set this path, it will be saved in a settings file (`settings.ini`) so you don't need to set it every time you open the application.
 1. In the UI, click `File > Load XML file` and select an `.xml` file produced by Ghidra using the "Debug Function Decompilation" option.
 
+If your project uses a custom [language definition](https://github.com/NationalSecurityAgency/ghidra/blob/master/Ghidra/Features/Base/src/main/help/help/topics/LanguageProviderPlugin/Languages.htm) from an extension not present in the ghidra installation, you will need to specify the path of a directory that contains that language definition (.ldefs file) using the -s command line option. If not certain about where to find that file, ask the developer of the extension.
+
 ## Obtaining `decomp_dbg`
 First, the `decomp_dbg` executable needs to be built. This only needs to be done once (or whenever the decompiler changes) and can be done using these steps:
 

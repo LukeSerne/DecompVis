@@ -5,6 +5,7 @@ import os
 import traceback
 import typing
 import xml.etree.ElementTree
+import argparse
 
 from util import get_decompile_data
 from decomp import Decomp, DecompStep
@@ -35,8 +36,10 @@ class MainWindow(QtWidgets.QMainWindow):
     text_edit: QtWidgets.QTextEdit
     thread_manager: QtCore.QThreadPool
 
-    def __init__(self):
+    def __init__(self, extra_paths = []):
         super().__init__()
+
+        self.extra_paths = extra_paths
 
         self.setWindowTitle("DecompVis")
 
@@ -203,7 +206,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         try:
             initial_pcode, data = get_decompile_data(
-                self.decomp_dbg_path, self.ghidra_dir, self.xml_path, self.xml_func_name
+                self.decomp_dbg_path, self.ghidra_dir, self.xml_path, self.xml_func_name, self.extra_paths
             )
 
             decomp = Decomp(initial_pcode)
@@ -263,9 +266,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--extra-paths', nargs='+', help='Define extra paths to search for language definitions (.ldefs)', required=False, default=[])
+    args = parser.parse_args()
+
     app = QtWidgets.QApplication(sys.argv)
 
-    mw = MainWindow()
+    mw = MainWindow(args.extra_paths)
     mw.show()
 
     exitcodesys = app.exec()

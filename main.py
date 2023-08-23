@@ -6,6 +6,7 @@ import traceback
 import typing
 import xml.etree.ElementTree
 import argparse
+import pathlib
 
 from util import get_decompile_data
 from decomp import Decomp, DecompStep
@@ -36,7 +37,7 @@ class MainWindow(QtWidgets.QMainWindow):
     text_edit: QtWidgets.QTextEdit
     thread_manager: QtCore.QThreadPool
 
-    def __init__(self, extra_paths = []):
+    def __init__(self, extra_paths = [], default_xml: typing.Optional[pathlib.Path] = None):
         super().__init__()
 
         self.extra_paths = extra_paths
@@ -102,6 +103,10 @@ class MainWindow(QtWidgets.QMainWindow):
         L.setRowStretch(0, 1)
         L.setRowStretch(1, 3)
 
+        # Load first xml if set
+        if default_xml is not None:
+            self._parse_xml_file(default_xml)
+
     def _try_set_ghidra_dir(self, ghidra_dir: str) -> bool:
         """
         Try to set the Ghidra folder. If this fails (because the folder does
@@ -130,6 +135,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if file_name == "":  # No XML file was selected
             return
 
+        self._parse_xml_file(file_name)
+
+    def _parse_xml_file(self, file_name):
+        """
+        Loads and parses the XML file the 'file_name' argument refers to. Fianally,
+        it feeds the XML into decomp_dbg.
+        """
         self.xml_path = file_name
 
         xml_data = xml.etree.ElementTree.parse(self.xml_path)
@@ -267,12 +279,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('xmlfile', nargs='?', help='Specify the path to an XML file to automatically load it', type=lambda p: pathlib.Path(p).absolute())
     parser.add_argument('-s', '--extra-paths', nargs='+', help='Define extra paths to search for language definitions (.ldefs)', required=False, default=[])
     args = parser.parse_args()
 
     app = QtWidgets.QApplication(sys.argv)
 
-    mw = MainWindow(args.extra_paths)
+    mw = MainWindow(args.extra_paths, args.xmlfile)
     mw.show()
 
     exitcodesys = app.exec()

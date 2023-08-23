@@ -67,16 +67,18 @@ class MainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(self.zoom_out_act)
 
         # Create main widget
-        main_widget = QtWidgets.QWidget()
-        self.setCentralWidget(main_widget)
-
-        self.list_widget = QtWidgets.QListWidget(main_widget)
-        self.list_widget.currentRowChanged.connect(self.handle_list_change)
-
-        self.text_edit = QtWidgets.QTextEdit(main_widget)
-        self.text_edit.setReadOnly(True)
-
         self.graph_view = GraphView(None, self)
+        self.setCentralWidget(self.graph_view)
+
+        self.list_widget = QtWidgets.QListWidget(self)
+        self.list_widget.currentRowChanged.connect(self.handle_list_change)
+        list_dock_widget = QtWidgets.QDockWidget("P-CODE Stages", self)
+        list_dock_widget.setWidget(self.list_widget)
+
+        self.text_edit = QtWidgets.QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        text_dock_widget = QtWidgets.QDockWidget("Information", self)
+        text_dock_widget.setWidget(self.text_edit)
 
         # Add a zoom slider to the status bar
         self.zoom_slider = ZoomSliderWidget(len(self.zoom_levels), self.zoom_levels.index(1.0), self)
@@ -93,15 +95,8 @@ class MainWindow(QtWidgets.QMainWindow):
             # dir is invalid, reset ini
             self.settings.setValue("ghidra_dir", self.ghidra_dir)
 
-        L = QtWidgets.QGridLayout(main_widget)
-        L.addWidget(self.text_edit, 0, 0)
-        L.addWidget(self.graph_view, 0, 1, 2, 1)
-        L.addWidget(self.list_widget, 1, 0)
-
-        L.setColumnStretch(0, 1)
-        L.setColumnStretch(1, 3)
-        L.setRowStretch(0, 1)
-        L.setRowStretch(1, 3)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, list_dock_widget)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, text_dock_widget)
 
         # Load first xml if set
         if default_xml is not None:

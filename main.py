@@ -10,7 +10,7 @@ import pathlib
 
 from util import get_decompile_data
 from decomp import Decomp, DecompStep
-from ui import GraphView, ZoomSliderWidget
+from ui import GraphView, ZoomSliderWidget, SearchWidget
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -66,7 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(self.zoom_in_act)
         view_menu.addAction(self.zoom_out_act)
 
-        # Create main widget
+        # Create main widgets
         self.graph_view = GraphView(None, self)
         self.setCentralWidget(self.graph_view)
 
@@ -79,6 +79,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.text_edit.setReadOnly(True)
         text_dock_widget = QtWidgets.QDockWidget("Information", self)
         text_dock_widget.setWidget(self.text_edit)
+
+        self.search_widget = SearchWidget(self.graph_view, self)
+        search_dock_widget = QtWidgets.QDockWidget("Search Node", self)
+        search_dock_widget.setWidget(self.search_widget)
 
         # Add a zoom slider to the status bar
         self.zoom_slider = ZoomSliderWidget(len(self.zoom_levels), self.zoom_levels.index(1.0), self)
@@ -97,6 +101,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, list_dock_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, text_dock_widget)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, search_dock_widget)
 
         # Load first xml if set
         if default_xml is not None:
@@ -244,6 +249,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.list_widget.setEnabled(True)
         self.text_edit.setEnabled(True)
         self.graph_view.setEnabled(True)
+        self.search_widget.enable()
 
         self._handle_update_zoom(self.zoom_levels.index(1.0))
         self.handle_list_change(0)

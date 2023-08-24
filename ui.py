@@ -15,16 +15,20 @@ from PySide6.QtWidgets import (
     QGraphicsObject,
     QGraphicsScene,
     QGraphicsView,
-    QStyleOptionGraphicsItem,
+    QGridLayout,
     QHBoxLayout,
+    QLabel,
+    QLineEdit,
     QPushButton,
     QSlider,
+    QStyleOptionGraphicsItem,
     QWidget,
 )
 
 import networkx
 import math
 import typing
+from collections.abc import Iterator
 
 from util import Operation, layout_algorithm
 
@@ -354,6 +358,12 @@ class GraphView(QGraphicsView):
 
             self.scene().addItem(Edge(source, dest, offset, slots))
 
+    def get_nodes(self) -> Iterator[Node]:
+        """
+        Returns an iterator that yields all nodes that are in the scene.
+        """
+        return filter(lambda i: isinstance(i, Node), self.scene().items())
+
     def wheelEvent(self, event):
         """
         Called whenever the mouse wheel is moved while the cursor is over the
@@ -381,6 +391,7 @@ class GraphView(QGraphicsView):
         if cursor_is_center:
             # (reset back to original transformation anchor)
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+
 
 class ZoomSliderWidget(QWidget):
 
@@ -430,3 +441,88 @@ class ZoomSliderWidget(QWidget):
         self.slider.setSliderPosition(new_zoom_idx)
         self.minus_button.setEnabled(new_zoom_idx > 0)
         self.plus_button.setEnabled(new_zoom_idx < self.num_zoom_levels - 1)
+
+
+class SearchWidget(QWidget):
+    _search_results: list[Node] = []
+    _current_search_result: typing.Optional[Node] = None
+    _search_idx: int = -1
+    _graph_view: GraphView
+
+    def __init__(self, graph_view: GraphView, parent: QWidget):
+        super().__init__(parent)
+        self._graph_view = graph_view
+
+        self._next_button = QPushButton("Next", self)
+        self._prev_button = QPushButton("Prev", self)
+        self._search_button = QPushButton("?", self)
+        self._search_box = QLineEdit(self)
+        self._status = QLabel("Status")
+
+        layout = QGridLayout(self)
+        layout.addWidget(self._search_box, 0, 0, 1, 2)
+        layout.addWidget(self._search_button, 0, 2)
+        layout.addWidget(self._prev_button, 1, 0)
+        layout.addWidget(self._status, 1, 1)
+        layout.addWidget(self._next_button, 1, 2)
+
+        self._next_button.clicked.connect(self._handle_next)
+        self._prev_button.clicked.connect(self._handle_prev)
+        self._search_button.clicked.connect(self._handle_search)
+
+        self.disable()
+
+    def _handle_next(self, e):
+        self._change_focus(self._search_idx + 1)
+
+    def _handle_prev(self, e):
+        self._change_focus(self._search_idx - 1)
+
+    def _handle_search(self, e):
+        search_str = self._search_box.text()
+
+        for node in self._graph_view.get_nodes():
+            if search_str in node._name:
+                self._search_results.append(node)
+
+        self._change_focus(0)
+
+    def disable(self):
+        """
+        Resets and disables all UI elements and the internal state of the widget.
+        """
+        self._search_box.setText("")
+        self._search_box.setEnabled(False)
+        self._search_button.setEnabled(False)
+        self._prev_button.setEnabled(False)
+        self._next_button.setEnabled(False)
+        self._status.setText("")
+
+        self._search_idx = -1
+        self._search_results = []
+        self._current_search_result = None
+
+    def enable(self):
+        self._search_box.setEnabled(True)
+        self._search_button.setEnabled(True)
+        self._prev_button.setEnabled(True)
+        self._next_button.setEnabled(True)
+
+    def _change_focus(self, new_idx: int):
+        """
+        Changes the focus of the main graph view to the search result at index
+        new_idx and updates the internal state of the search widget.
+        """
+        num_results = len(self._search_results)
+        old_idx = self._search_idx
+        self._search_idx = min(num_results - 1, max(0, new_idx))
+        if self._search_idx == old_idx:
+            return
+
+        self._current_search_result = self._search_results[self._search_idx]
+        self._graph_view.centerOn(self._current_search_result)
+        self._graph_view.scene().setFocusItem(self._current_search_result)
+
+        self._prev_button.setEnabled(self._search_idx != 0)
+        self._next_button.setEnabled(self._search_idx != num_results - 1)
+        self._status.setText(f"{self._search_idx + 1} / {num_results}")

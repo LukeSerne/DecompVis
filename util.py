@@ -63,6 +63,22 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
 
     return initial_pcode, decomp_log
 
+def make_xpath_string(string: str) -> str:
+    """
+    Takes a Python string and converts it to a string representing an XPath
+    expression that represents the same string value. Note that this only
+    targets the limited subset of XPath supported by Python's xml.etree.ElementTree,
+    as described here: https://docs.python.org/3/library/xml.etree.elementtree.html#supported-xpath-syntax
+
+    Raises a ValueError if the input string cannot be represented.
+    """
+    if "'" in string or '"' in string:
+        raise ValueError(f"XPath strings (as supported by xml.etree.ElementTree) cannot contain any quotes, got {string!r}")
+
+    # The string does not contain any quotes, so we can safely wrap it using
+    # single quotes.
+    return "'" + string + "'"
+
 def find_matching_open_paren_to_final_close_paren(string: str) -> int:
     """
     Returns the index of the matching '(' for the ')' that ends the input string.

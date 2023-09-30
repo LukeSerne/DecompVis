@@ -8,7 +8,7 @@ import xml.etree.ElementTree
 import argparse
 import pathlib
 
-from util import get_decompile_data
+from util import get_decompile_data, make_xpath_string
 from decomp import Decomp, DecompStep
 from ui import GraphView, ZoomSliderWidget, SearchWidget
 
@@ -147,30 +147,51 @@ class MainWindow(QtWidgets.QMainWindow):
         xml_data = xml.etree.ElementTree.parse(self.xml_path)
         xml_root = xml_data.getroot()
 
-        func_name = xml_root.get("name")
-        if func_name is None:
-            raise ValueError("No function name")
+        # Find the range for which we have bytes
+        bytechunks = xml_root.findall("./binaryimage/bytechunk")
+        if len(bytechunks) != 1:
+            raise ValueError(f"Unexpected number of bytechunk elements in XML: '{len(bytechunks)}' instead of '1'.")
 
-        if "::" in func_name:
-            raise ValueError(f"Function names containing '::' are not supported by the decompiler ({func_name!r})")
+        bytechunk = bytechunks[0]
+        bytechunk_space = make_xpath_string(bytechunk.get("space"))
 
+        bytechunk_start = int(bytechunk.get("offset"), 16)
+        # Assuming the bytes are stored in hexadecimal, the number of bytes is
+        # the number of non-whitespace characers divided by 2.
+        bytechunk_size = len(bytechunk.text.replace(" ", "").replace("\n", "")) // 2
+        bytechunk_range = range(bytechunk_start, bytechunk_start + bytechunk_size)
+
+        # Find the names of all functions defined in the XML file, and filter
+        # out those whose offsets are not inside the chunk for which we have bytes
+        function_names = []
         for scope in xml_root.findall("./save_state/db/scope"):
-            if scope.find(f"./symbollist/mapsym/function[@name={func_name!r}]") is None:
-                continue
-
-            # found the function
             scope_name = scope.get("name")
-            break
-        else:
-            raise ValueError(f"No function definition found for function {func_name!r}")
 
-        if scope_name is None:
-            raise ValueError(f"Scope containing function has no name attribute")
+            for function in scope.findall("./symbollist/mapsym/function"):
+                # Do we have the bytes for this function?
+                addr_def = function.find(f"./addr[@space={bytechunk_space}]")
+                if addr_def is None or int(addr_def.get("offset"), 16) not in bytechunk_range:
+                    continue
 
-        if scope_name != "":
-            func_name = f"{scope_name}::{func_name}"
+                # Yes - add the fully qualified name to the list of function
+                # names.
+                func_name = function.get('name')
 
-        self.xml_func_name = func_name
+                if "::" in func_name:
+                    raise ValueError(f"Function names containing '::' are not supported by the decompiler ({func_name!r})")
+
+                function_names.append(f"{scope_name}::{func_name}")
+
+        if not function_names:
+            raise ValueError("No function definition found in XML file")
+
+        if len(function_names) > 1:
+            # TODO: Handle this case more cleanly - for example by allowing the
+            # user to choose one of the functions.
+            print("Found multiple functions - picking first one")
+            print(function_names)
+
+        self.xml_func_name = function_names[0]
         self.load_decomp_data()
 
     def _handle_set_ghidra_dir(self):

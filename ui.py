@@ -489,7 +489,7 @@ class SearchWidget(QWidget):
         self._prev_button.clicked.connect(self._handle_prev)
         self._search_button.clicked.connect(self._handle_search)
 
-        self.disable()
+        self.disable(clear_search_text=True)
 
     def _handle_next(self, e):
         self._change_focus(self._search_idx + 1)
@@ -500,17 +500,22 @@ class SearchWidget(QWidget):
     def _handle_search(self, e):
         search_str = self._search_box.text()
 
+        self.disable(clear_search_text=False)
+
         for node in self._graph_view.get_nodes():
             if search_str in node._name:
                 self._search_results.append(node)
 
+        self.enable()
         self._change_focus(0)
 
-    def disable(self):
+    def disable(self, clear_search_text: bool):
         """
         Resets and disables all UI elements and the internal state of the widget.
+        If 'clear_search_text' is set, also clears the text in the search box.
         """
-        self._search_box.setText("")
+        if clear_search_text:
+            self._search_box.setText("")
         self._search_box.setEnabled(False)
         self._search_button.setEnabled(False)
         self._prev_button.setEnabled(False)

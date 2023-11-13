@@ -286,20 +286,115 @@ class Identifier:
 
         # Now parse the base name:
         is_addr = lambda n: n.startswith("invalid_addr") or n.startswith("0x")
+        space_shortcut = name[0]
 
-        if (name[0].islower() or name[0] in "#%") and is_addr(name[1:]):
-            # basically any lowercase character can be an address space shortcut
-            space_shortcut = name[0]
-            # name == "invalid_addr"
+        def parse_addr_space(data: str) -> typing.Optional[str]:
+            """
+            Parses an address space description, as produced by 'AddrSpace::printRaw',
+            and returns a normalised string version. If parsing fails, this
+            function returns None.
+            """
+            if not data.startswith("0x"): return
+            if "+" in data:
+                addr_part = data[:data.index("+")]
+                plus_part = int(data[data.index("+") + 1:], 10)
+                if plus_part <= 0: return
+            else:
+                addr_part = data
+                plus_part = 0
+
+            if len(addr_part) not in (4, 6, 8, 10, 14): return
+            addr_part = int(addr_part[2:], 16)
+
+            return f"{addr_part:#x}+{plus_part}"
+
+        # Ref: 'AddrSpaceManager::assignShortcut' in translate.cc
+        is_parsed = False
+        if space_shortcut == "#" and name.startswith("#0x"):  # IPTR_CONSTANT
+            # name = "#0x" value
+            # value: [0-9][a-f]*
+            name = f"{int(name[1:], 16):#x}"
+            is_parsed = True
+
+        elif space_shortcut in r"%o":  # IPTR_PROCESSOR
+            # %: register
+            # o: other
+            # ???
+            # name == "o0x" offset
             # name == "0x{offset:0{size}x}"
             # name == "0x{offset:0{size}x}+{\d+}"
             name = name[1:]
-        else:
-            # register / function name
-            # name == "{reg}+{\d+}"
-            # name == "{reg}"
-            # name == "f{function_name}"
-            space_shortcut = "%"  # add '%' shortcut for consistency
+            is_parsed = True
+
+        elif space_shortcut == "s":  # IPTR_SPACEBASE
+            # TODO
+            ...
+
+        elif space_shortcut == "u":  # IPTR_INTERNAL
+            # name = "u" addr_space
+            name = parse_addr_space(name[1:])
+
+        elif space_shortcut == "f" and name.startswith("ffunc_"):  # IPTR_FSPEC - cf. FspecSpace::printRaw
+            # name == "f" function_name -- this case is not handled here because
+            #                              of ambiguity...
+            # name == "ffunc_" function_addr
+            name = name[1:]
+            is_parsed = True
+
+        elif space_shortcut == "j" and name[1] == "{" and name[-1] == "}":  # IPTR_JOIN - cf. JoinSpace::printRaw
+            # name == "j{" addr_space ":" sznum "}"
+            # name == "j{" addr_space ("," addr_space)+ "}"
+            # addr_space: "0x" [0-9a-f]{1,2,3,4,6} ("+" [1-9][0-9]*)?
+
+            # there is no "," in addr_space, so we can split on that
+            spaces = name[2:-1].split(",")
+            if len(spaces) == 1:
+                assert ":" in name, name
+                sznum = int(name[name.index(":") + 1:-1], 10)
+            else:
+                sznum = "unknown"
+
+            desc = []
+            for space in spaces:
+                addr = parse_addr_space(space)
+                assert addr is not None, (name, space)
+                desc.append(addr)
+
+            name = f"JOIN {desc} size={sznum}"
+            is_parsed = True
+
+        elif space_shortcut == "i":  # IPTR_IOP
+            # IopSpace::printRaw
+            # name == "i" pc_raw (":" uniq)?
+            # name == "icode_" branch_addr_shortcut branch_addr
+            # pc_raw: "invalid_addr" | addr_space
+            # uniq: int
+
+            if name.startswith("icode_"):
+                # "icode_" branch_addr_shortcut branch_addr
+                # TODO: Parse this
+                name = f"IOP branch {name}"
+            else:
+                # "i" pc_raw (":" uniq)?
+                target_str = name[1:]
+                try:
+                    pc_raw, uniq_str = target_str.split(":")
+                except ValueError:
+                    pc_raw, uniq_str = target_str, "-1"
+
+                if pc_raw == "invalid_addr":
+                    pc = None
+                else:
+                    pc = parse_addr_space(pc_raw)
+                    assert pc is not None, (name, pc_raw)
+                uniq = int(uniq_str, 16)
+
+                name = f"IOP {pc}:{uniq}"
+            is_parsed = True
+
+        if not is_parsed:
+            # The name is something that could not be parsed
+            space_shortcut = "?"
             name = name
 
         return Identifier(is_free, is_input, is_written, size, seq_num, space_shortcut, name)

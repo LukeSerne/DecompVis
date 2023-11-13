@@ -1,4 +1,4 @@
-from PySide6.QtCore import QLineF, QPointF, QRectF, Qt
+from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, QVariantAnimation
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -167,6 +167,25 @@ class Node(QGraphicsObject):
 
         return super().itemChange(change, value)
 
+    def highlight(self):
+        self._og_bg_brush = self._bg_brush
+        animation = QVariantAnimation(self)
+        animation.setStartValue(0)
+        animation.setEndValue(2 * 255)
+        animation.setDuration(1000)
+        animation.setLoopCount(2)
+        animation.valueChanged.connect(self.invertedBrush)
+        animation.start()
+
+    def invertedBrush(self, animation_step: int):
+        if animation_step == 2*255:  # done
+            self._bg_brush = self._og_bg_brush
+        else:
+            if animation_step >= 255:
+                animation_step = 2*255 - animation_step
+
+            self._bg_brush = QBrush(QColor(animation_step - self._og_bg_brush.color().red(), animation_step - self._og_bg_brush.color().green(), animation_step - self._og_bg_brush.color().blue()))
+        self.update()
 
 class Edge(QGraphicsItem):
     def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, parent: QGraphicsItem = None):
@@ -522,6 +541,7 @@ class SearchWidget(QWidget):
         self._current_search_result = self._search_results[self._search_idx]
         self._graph_view.centerOn(self._current_search_result)
         self._graph_view.scene().setFocusItem(self._current_search_result)
+        self._current_search_result.highlight()
 
         self._prev_button.setEnabled(self._search_idx != 0)
         self._next_button.setEnabled(self._search_idx != num_results - 1)

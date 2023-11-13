@@ -149,38 +149,39 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Find the range for which we have bytes
         bytechunks = xml_root.findall("./binaryimage/bytechunk")
-        if len(bytechunks) != 1:
-            raise ValueError(f"Unexpected number of bytechunk elements in XML: '{len(bytechunks)}' instead of '1'.")
+        if not bytechunks:
+            raise ValueError(f"Did not find 'bytechunk' elements in the provided XML!")
 
-        bytechunk = bytechunks[0]
-        bytechunk_space = make_xpath_string(bytechunk.get("space"))
-
-        bytechunk_start = int(bytechunk.get("offset"), 16)
-        # Assuming the bytes are stored in hexadecimal, the number of bytes is
-        # the number of non-whitespace characers divided by 2.
-        bytechunk_size = len(bytechunk.text.replace(" ", "").replace("\n", "")) // 2
-        bytechunk_range = range(bytechunk_start, bytechunk_start + bytechunk_size)
-
-        # Find the names of all functions defined in the XML file, and filter
-        # out those whose offsets are not inside the chunk for which we have bytes
         function_names = []
-        for scope in xml_root.findall("./save_state/db/scope"):
-            scope_name = scope.get("name")
+        for bytechunk in bytechunks:
+            bytechunk_space = make_xpath_string(bytechunk.get("space"))
 
-            for function in scope.findall("./symbollist/mapsym/function"):
-                # Do we have the bytes for this function?
-                addr_def = function.find(f"./addr[@space={bytechunk_space}]")
-                if addr_def is None or int(addr_def.get("offset"), 16) not in bytechunk_range:
-                    continue
+            bytechunk_start = int(bytechunk.get("offset"), 16)
+            # Assuming the bytes are stored in hexadecimal, the number of bytes
+            # is the number of non-whitespace characers divided by 2.
+            bytechunk_size = len(bytechunk.text.replace(" ", "").replace("\n", "")) // 2
+            bytechunk_range = range(bytechunk_start, bytechunk_start + bytechunk_size)
 
-                # Yes - add the fully qualified name to the list of function
-                # names.
-                func_name = function.get('name')
+            # Find the names of all functions defined in the XML file, and filter
+            # out those whose offsets are not inside the chunk for which we have
+            # bytes
+            for scope in xml_root.findall("./save_state/db/scope"):
+                scope_name = scope.get("name")
 
-                if "::" in func_name:
-                    raise ValueError(f"Function names containing '::' are not supported by the decompiler ({func_name!r})")
+                for function in scope.findall("./symbollist/mapsym/function"):
+                    # Do we have the bytes for this function?
+                    addr_def = function.find(f"./addr[@space={bytechunk_space}]")
+                    if addr_def is None or int(addr_def.get("offset"), 16) not in bytechunk_range:
+                        continue
 
-                function_names.append(f"{scope_name}::{func_name}")
+                    # Yes - add the fully qualified name to the list of function
+                    # names.
+                    func_name = function.get('name')
+
+                    if "::" in func_name:
+                        raise ValueError(f"Function names containing '::' are not supported by the decompiler ({func_name!r})")
+
+                    function_names.append(f"{scope_name}::{func_name}")
 
         if not function_names:
             raise ValueError("No function definition found in XML file")

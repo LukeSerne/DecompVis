@@ -225,7 +225,7 @@ class Identifier:
     _name: str = ""
 
     @staticmethod
-    def from_raw(name: str) -> "Identifier":
+    def from_raw(name: str, no_size: bool = False) -> "Identifier":
         # base:
         # <reg>
         # <reg>\+\d+
@@ -262,7 +262,7 @@ class Identifier:
                 try:
                     Identifier.from_raw(part[1:-1])
                 except:
-                    print(f"Unexpected parenthesised group at the end of varnode: {name!r}")
+                    print(f"Warning: Unexpected parenthesised group at the end of varnode: {name!r}")
                     traceback.format_exc()
 
             name = name[:start_idx]
@@ -270,19 +270,20 @@ class Identifier:
         # Then check for size modifier - make sure to not misidentify the size
         # if there is a colon in the name.
         size = None
-        if ":" in name:
-            name, size_ = name.rsplit(":", 1)
-            try:
-                size = int(size_)
-            except ValueError:
-                # This was probably a function name / storage location with a
-                # colon in it.
-                pass
+        if not no_size:
+            if ":" in name:
+                name, size_ = name.rsplit(":", 1)
+                try:
+                    size = int(size_)
+                except ValueError:
+                    # This was probably a function name / storage location with a
+                    # colon in it.
+                    name += ":" + size_
 
-        if size is None:
-            # TODO: Somehow calculate the expected size
-            # print(f"Implicit size for {name!r}")
-            size = 4
+            if size is None:
+                # TODO: Somehow calculate the expected size
+                # print(f"Implicit size for {name!r}")
+                size = 4
 
         # Now parse the base name:
         is_addr = lambda n: n.startswith("invalid_addr") or n.startswith("0x")
@@ -377,6 +378,7 @@ class Identifier:
             else:
                 # "i" pc_raw (":" uniq)?
                 target_str = name[1:]
+
                 try:
                     pc_raw, uniq_str = target_str.split(":")
                 except ValueError:
@@ -387,9 +389,12 @@ class Identifier:
                 else:
                     pc = parse_addr_space(pc_raw)
                     assert pc is not None, (name, pc_raw)
-                uniq = int(uniq_str, 16)
+                    assert pc.endswith("+0"), pc
+                    pc = int(pc[:-len("+0")], 16)
 
+                uniq = int(uniq_str, 16)
                 name = f"IOP {pc}:{uniq}"
+                seq_num = (pc, uniq)
             is_parsed = True
 
         if not is_parsed:
@@ -449,16 +454,17 @@ class Identifier:
 
 @dataclass(frozen=True)
 class InstructionReference:
-    _target_addr: str = ""  # The address of the target operation
+    _target: Identifier  # The target operation
 
     @staticmethod
     def from_raw(name: str) -> "InstructionReference":
-        ident = Identifier.from_raw(name)
-        assert ident._space_shortcut == "i", name
-        return InstructionReference(ident._name)
+        ident = Identifier.from_raw(name, no_size=True)
+        assert ident._space_shortcut == "i", (name, ident)
+        assert ident._size is None, (name, ident)
+        return InstructionReference(ident)
 
     def get_node_name(self) -> str:
-        return f"REF {self._target_addr}"
+        return f"REF {self._target}"
 
     def get_color_name(self) -> str:
         return "blue"
@@ -471,7 +477,7 @@ class Operation:
     # the line that produced this operation
     _line: str
     # the address of this operation
-    _addr: str
+    _addr: tuple[int, int]
     # whether the thing is empty
     _is_empty: bool
     # the CPUI name of this operation
@@ -487,8 +493,8 @@ class Operation:
 
         # eg. 0x800fb41c:22: u0x1000000d:1(0x800fb41c:22) = u0x10000012:1(0x800fb41c:61)
         parts = full_line.split(" ")
-        assert parts[0].endswith(":")
-        addr = parts[0][:-1]
+        assert parts[0].endswith(":"), line
+        addr = tuple(map(lambda n: int(n, 16), parts[0][:-1].split(":")))
         num_parts = len(parts)
 
         _in: typing.Sequence[Identifier | AddrSpace | InstructionReference | None] = []
@@ -536,9 +542,8 @@ class Operation:
 
         if parts[1] in ("call", "callind") or (num_parts >= 4 and parts[3] in ("call", "callind")):  # TypeOpCall, TypeOpCallind
 
-            has_out = not parts[1] in ("call", "callind")
+            has_out = parts[1] not in ("call", "callind")
             call_part = parts[1] if not has_out else parts[3]
-
             function = parts[2] if not has_out else parts[4]
 
             # How do we even differentiate between call fName(<addr>) [no args]

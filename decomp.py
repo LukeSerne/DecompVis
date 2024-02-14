@@ -63,6 +63,7 @@ class DecompState:
 
         for op in operations:
             # Add node
+            assert op._addr not in self._state, f"{op._addr} already in graph"
             self._state.add_node(op._addr, node_item=op)
 
             # Add output edge (and output varnode if it doesn't exist already)
@@ -77,7 +78,8 @@ class DecompState:
             # Add input edges (and varnodes if necessary)
             for inp in op._in:
                 if inp is None:
-                    continue  # BUG?
+                    print(f"Warning: Operation {op} has None as input")
+                    continue
 
                 if inp not in self._state:
                     self._state.add_node(inp, node_item=inp)
@@ -86,7 +88,10 @@ class DecompState:
                     # Special case for instruction references - Add extra edge
                     # to reference target.
                     # TODO: Maybe make this a dotted line?
-                    edges_to_create.append((inp._target_addr, inp))
+                    if inp._target._seq_num is None:
+                        print(f"Warning: Instruction reference to None: {inp}")
+                    else:
+                        edges_to_create.append((inp._target._seq_num, inp))
 
                 edges_to_create.append((inp, op._addr))
 
@@ -144,7 +149,7 @@ class DecompState:
                         # Special case for instruction references - Add extra edge
                         # to reference target.
                         # TODO: Maybe make this a dotted line?
-                        self._state.add_edge(inp._target_addr, inp)
+                        self._state.add_edge(inp._target._seq_num, inp)
 
                     self._state.add_edge(inp, new_line._addr)
 

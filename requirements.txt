@@ -1,2 +1,3 @@
 networkx>=2.8.8
 PySide6>=6.5.0
+pwntools>=4.11.1

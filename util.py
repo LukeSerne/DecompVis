@@ -1,4 +1,5 @@
 import networkx
+import pwn
 
 import subprocess
 from dataclasses import dataclass
@@ -6,7 +7,96 @@ import typing
 import traceback
 import itertools
 
-def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str, extra_paths: list[str]) -> tuple[bytes, list[bytes]]:
+def find_runs(haystack: str, needles: list[str]):
+    """
+    A generator that yields 3-tuples (needle_type, start_idx, end_idx) for every
+    run of consecutive needles of the same type in the string 'haystack'.
+    Assumes all needles are 1 character long. 
+    """
+    idx = 0
+
+    while True:
+        next_needles = {needle: haystack.find(needle, idx) for needle in needles}
+        try:
+            needle_type = min([k for k in next_needles.keys() if next_needles[k] != -1], key=next_needles.get)
+        except ValueError:
+            # no needles left in haystack
+            break
+
+        needle_idx = next_needles[needle_type]
+        
+        for needle_end in range(needle_idx, len(haystack)):
+            if haystack[needle_end] != needle_type:
+                break
+
+        yield (needle_type, needle_idx, needle_end)
+        idx = needle_end
+
+def html_escape(text: str) -> str:
+    """
+    Returns the HTML-escaped version of a string. This function replaces the
+    characters '<', '>' and '&' with their respective HTML escape sequences.
+    Assumes the input does not contain any HTML escape sequences.
+    """
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+def html_get_nth_char_idx(target_str: str, n: int) -> int:
+    """
+    Returns the index of the n'th character in the target string, counting HTML
+    escape sequences as a single character.
+    Raises ValueError if the string contains fewer than n characters
+    """
+    target_len = len(target_str)
+    i = 0
+    while i < target_len:
+        if n == 0:
+            return i
+
+        if target_str[i] == "&":  # html escape sequences, skip until ';'
+            i = target_str.find(";", i)
+
+        i += 1
+        n -= 1
+
+    raise ValueError(f"Supplied index {n} out of range for string {target_str}")
+
+def colourise_diff(diff: list[str]) -> str:
+    """
+    This function adds markup to the input string, which is assumed to be a diff
+    as produced by difflib. The returned string contains a HTML description of a
+    table with the changed parts of the diff highlighted.
+    """
+    table_rows = []
+
+    for line in diff:
+        prefix, line = line[:2], line[2:]
+        escaped_line = html_escape(line)
+
+        if prefix == "  ":
+            table_rows.append(f"<td><tt>{escaped_line}</tt></td>")
+        elif prefix == "+ ":
+            table_rows.append(f"<td bgcolor='#e6ffec'><tt>{escaped_line}</tt></td>")
+        elif prefix == "- ":
+            table_rows.append(f"<td bgcolor='#ffebe9'><tt>{escaped_line}</tt></td>")
+        elif prefix == "? ":
+            offset = len("<td bgcolor='#ffebe9'><tt>")
+            prev = table_rows.pop()
+            prev_is_add = prev.startswith("<td bgcolor='#e6ffec'>")
+
+            for run_type, high_start, high_end in find_runs(line, ("^", "-", "+")):
+                bg_col = "#abf2bc" if prev_is_add else "#ffc0c0"
+                chunk_start = html_get_nth_char_idx(prev, offset + high_start)
+                chunk_end = html_get_nth_char_idx(prev, offset + high_end)
+                prev = prev[:chunk_start] + f"<span style='background-color:{bg_col}'>" + prev[chunk_start:chunk_end] + "</span>" + prev[chunk_end:]
+                offset += len(f"<span style='background-color:{bg_col}'></span>")
+            
+            table_rows.append(prev)
+        else:
+            print(f"Unknown prefix {prefix!r}, skipping line...")
+
+    return "<table width='100%'><tr>" + "</tr><tr>".join(table_rows) + "</tr></table>"
+
+def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str, extra_paths: list[str]) -> list[tuple[bytes, bytes]]:
     """
     Executes the decompiler on the given xml file and returns the P-CODE diffs
     and initial P-CODE.
@@ -19,49 +109,73 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
     command_args = zip(['-s'] * len(extra_paths), extra_paths)
     command = [decomp_path] + list(itertools.chain.from_iterable(command_args))
 
-    # TODO: This converts str to bytes only for later functions (eg. Operation::from_raw)
-    # to convert the bytes back to str. Consider just returning str from this
-    # function.
+    #with pwn.process(command, env={"SLEIGHHOME": "/home/luke/tools/ghidra_11.0.1_PUBLIC/"}) as p:
+    with pwn.process(command, env={"SLEIGHHOME": ghidra_path}) as p:
+        p.sendlineafter(b"[decomp]> ", f"restore {xml_path}".encode("utf-8"))
+        p.readline()
 
-    input_commands = (
-        f"restore {xml_path}\n"
-        f"load function {func_name}\n"
-        "trace address\n"
-        "print raw\n"
-        "decompile\n"
-        "quit\n"
-    )
+        _restore_resp = p.readuntil(b"[decomp]> ")
+        if b"successfully loaded:" not in _restore_resp:
+            raise ValueError(f"Unexpected response to 'restore {xml_path}': {_restore_resp.decode('utf-8')!r}")
 
-    output = subprocess.run(
-        command, input=input_commands, env={"SLEIGHHOME": ghidra_path},
-        capture_output=True, check=True, text=True
-    ).stdout
+        p.sendline(b"load function " + func_name.encode("utf-8"))
+        p.readline() 
 
-    # -1 is used as index to select the first element of the split if the
-    # function is not namespaced
-    bare_func_name = func_name.rsplit("::", 1)[-1]
+        _load_resp = p.readuntil(b"[decomp]> ").decode("utf-8")
+        # -1 is used as index to select the first element of the split if the
+        # function is not namespaced
+        bare_func_name = func_name.rsplit("::", 1)[-1]
+        if not _load_resp.startswith(f"Function {bare_func_name}: "):
+            raise ValueError(f"Unexpected response to 'load function {func_name}': {_load_resp!r}")
 
-    lines = output.split("\n")
-    if not lines[1].startswith(f"{xml_path} successfully loaded: "):
-        raise ValueError(f"Unexpected response to 'restore {xml_path}': {lines[1]!r}")
-    if not lines[3].startswith(f"Function {bare_func_name}: "):
-        raise ValueError(f"Unexpected response to 'load function {func_name}': {lines[3]!r}")
-    if lines[5] != "OK (1 ranges)":
-        raise ValueError(f"Unexpected response to 'trace address': {lines[5]!r}")
+        p.sendline(b"trace address")
+        p.readline()
 
-    # Calculate begin and end of the decompilation output
-    decomp_cmd_idx = lines.index("[decomp]> decompile")
-    decomp_end_idx = lines.index("Decompilation complete", decomp_cmd_idx)
+        _range_resp = p.readuntil(b"[decomp]> ", drop=True)
+        if _range_resp != b"OK (1 ranges)\n":
+            raise ValueError(f"Unexpected response to 'trace address': {_range_resp.decode('utf-8')!r}")
 
-    # The first 7 lines are other output (our previous commands and responses),
-    # so skip those.
-    initial_pcode = "\n".join(lines[7:decomp_cmd_idx]).encode("utf-8")
+        p.sendline(b"trace break 1")
+        p.readline()
 
-    # The line after the decomp_cmd_idx is "Decompiling {func_name}", which we
-    # don't want in our output
-    decomp_log = "\n".join(lines[decomp_cmd_idx + 2:decomp_end_idx]).encode("utf-8").split(b"\n\n")
+        _break_resp = p.readuntil(b"[decomp]> ", drop=True)
+        if _break_resp != b"OK\n":
+            raise ValueError(f"Unexpected response to 'trace break 1': {_break_resp.decode('utf-8')!r}")
 
-    return initial_pcode, decomp_log
+        ## Start the decompilation
+        pcodes = []
+        p.sendline(b"print raw")
+        p.readline()
+        pcodes.append((b"Raw P-CODE", p.readuntil(b"[decomp]> ", drop=True)))
+
+        p.sendline(b"decompile")
+        p.readline()
+
+        # Step through the decompilation process, one rule at a time
+        for i in itertools.count(0, 1):
+            rule_type = p.readline()
+
+            # Process the pcode
+            if p.readuntil(b"[decomp]> ", drop=True).endswith(b"Decompilation complete\n"):
+                break
+
+            # We're not done yet - take another step
+            p.send(
+                b"trace enable\n"
+                b"trace break 1\n"
+                b"print raw\n"
+                b"continue\n"
+            )
+            p.readuntil(b"[decomp]> ")
+            p.readuntil(b"[decomp]> ")
+            p.readline()
+
+            pcode = p.readuntil(b"[decomp]> ", drop=True)
+            pcodes.append((rule_type.rsplit(b" ", 1)[1].strip(), pcode))
+
+            p.readline()
+
+    return pcodes
 
 def make_xpath_string(string: str) -> str:
     """
@@ -420,20 +534,14 @@ class Identifier:
         if self._size != other._size: return False
         if self._is_input != other._is_input: return False
         if self._is_written != other._is_written: return False
-        # HACK: Only comparing self._seq_num[0] because the diffs don't tell us
-        # when the 'time' (self._seq_num[1]) of an identifier is changed.
-        # Issue: https://github.com/NationalSecurityAgency/ghidra/issues/4963
-        if self._is_written and not self._is_input and self._seq_num[0] != other._seq_num[0]: return False
+        if self._is_written and not self._is_input and self._seq_num != other._seq_num: return False
 
         return True
 
     def __hash__(self) -> int:
-        # HACK: Only using self._seq_num[0] because the diffs don't tell us
-        # when the 'time' (self._seq_num[1]) of an identifier is changed.
-        # Issue: https://github.com/NationalSecurityAgency/ghidra/issues/4963
         return (
             self._space_shortcut, self._name, self._size, self._is_input,
-            self._is_written, self._seq_num[0] if self._is_written and not self._is_input else -1
+            self._is_written, self._seq_num if self._is_written and not self._is_input else -1
         ).__hash__()
 
     def __str__(self) -> str:

@@ -7,9 +7,10 @@ import typing
 import xml.etree.ElementTree
 import argparse
 import pathlib
+import difflib
 
-from util import get_decompile_data, make_xpath_string
-from decomp import Decomp, DecompStep
+from util import get_decompile_data, make_xpath_string, colourise_diff, html_escape
+from decomp import Decomp
 from ui import GraphView, ZoomSliderWidget, SearchWidget
 
 
@@ -17,7 +18,7 @@ class MainWindow(QtWidgets.QMainWindow):
     decomp_dbg_suffix: str = os.path.join(
         "Ghidra", "Features", "Decompiler", "src", "decompile", "cpp", "decomp_dbg"
     )
-    load_data_done: QtCore.Signal = QtCore.Signal(Decomp, str)
+    load_data_done: QtCore.Signal = QtCore.Signal(Decomp)
     zoom_levels: tuple[float] = (
         0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7,
         0.75, 0.85, 0.9, 0.95, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0,
@@ -28,7 +29,6 @@ class MainWindow(QtWidgets.QMainWindow):
     ghidra_dir: str = ""
     decomp_dbg_path: str = ""
     decomp: typing.Optional[Decomp] = None
-    initial_pcode: str = ""
     settings: QtCore.QSettings
     zoom_idx: int = zoom_levels.index(1.0)
 
@@ -77,6 +77,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.text_edit = QtWidgets.QTextEdit(self)
         self.text_edit.setReadOnly(True)
+        self.text_edit.setLineWrapMode(QtWidgets.QTextEdit.LineWrapMode.NoWrap)
+
         text_dock_widget = QtWidgets.QDockWidget("Information", self)
         text_dock_widget.setWidget(self.text_edit)
 
@@ -239,13 +241,11 @@ class MainWindow(QtWidgets.QMainWindow):
         decomp = None
 
         try:
-            initial_pcode, data = get_decompile_data(
+            pcodes = get_decompile_data(
                 self.decomp_dbg_path, self.ghidra_dir, self.xml_path, self.xml_func_name, self.extra_paths
             )
 
-            decomp = Decomp(initial_pcode)
-            for i, rule in enumerate(data):
-                decomp.add_step(DecompStep(rule))
+            decomp = Decomp(pcodes)
         except:
             print("Exception while loading the Decompiler data!")
             print(traceback.format_exc())
@@ -253,20 +253,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 print("Cancelling loading!")
                 return
 
-        self.load_data_done.emit(decomp, initial_pcode.decode("utf-8"))
+        self.load_data_done.emit(decomp)
 
-    def _process_load_decomp_data(self, decomp: Decomp, initial_pcode: str):
+    def _process_load_decomp_data(self, decomp: Decomp):
         self.decomp = decomp
-        self.initial_pcode = initial_pcode
 
         self.list_widget.clear()
-        self.list_widget.addItems(
-            ["Raw P-CODE"]
-            + [
-                self.decomp.get_step(i).get_short_desc()
-                for i in range(self.decomp.get_num_steps())
-            ]
-        )
+        self.list_widget.addItems([
+            f"{i}: {rule_name}"
+            for i, rule_name in enumerate(self.decomp.get_rule_names())
+        ])
 
         self.list_widget.setEnabled(True)
         self.text_edit.setEnabled(True)
@@ -292,12 +288,18 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         Handles the selected entry in the list changing
         """
-        self.graph_view.set_graph(self.decomp.get_state(new_index).get_graph())
+        state = self.decomp.get_state(new_index)
 
-        if new_index == 0:
-            self.text_edit.setPlainText(self.initial_pcode)
-        else:
-            self.text_edit.setPlainText(str(self.decomp.get_step(new_index - 1)))
+        self.graph_view.set_graph(state.get_graph())
+
+        full_text = ""
+
+        if new_index != 0:
+            prev_state = self.decomp.get_state(new_index - 1)
+            full_text = "<h1>Delta</h1>" + colourise_diff(difflib.ndiff(prev_state._pcode.split("\n"), state._pcode.split("\n")))
+
+        full_text += "<h1>New State</h1><div><tt>" + html_escape(state._pcode).strip("\n").replace("\n", "<br/>") + "</tt></div>"
+        self.text_edit.setText(full_text)
 
 
 if __name__ == "__main__":

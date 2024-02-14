@@ -108,24 +108,20 @@ class Node(QGraphicsObject):
             self._color_name = self.COLOR_NAMES[(color_idx + 1) % len(self.COLOR_NAMES)]
             self._color = self.COLORS[self._color_name]
             self._bg_brush = QBrush(self._color)
-            border_color = self._color.lighter() if self._is_selected else self._color.darker()
-            self._border_pen = QPen(
-                border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-            )
             self._text_pen = QPen(QColor(
                 "white" if self._color_name in {"brown", "gray"} else "black"
             ))
 
         elif ev.button() == Qt.MiddleButton:
             self._is_selected = not self._is_selected
-            border_color = self._color.lighter() if self._is_selected else self._color.darker()
-            self._border_pen = QPen(
-                border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-            )
 
         else:
             return
 
+        border_color = self._color.lighter() if self._is_selected else self._color.darker()            
+        self._border_pen = QPen(
+            border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+        )
         self.update()
 
     def boundingRect(self) -> QRectF:
@@ -195,7 +191,7 @@ class Edge(QGraphicsItem):
         self._dest_index = dest_index
         self._dest_num_inputs = dest_num_inputs
 
-        self._tickness = 2
+        self._thickness = 2
         self._color = "#2BB53C"
         self._arrow_size = 15
 
@@ -216,10 +212,10 @@ class Edge(QGraphicsItem):
             QRectF(self._line.p1(), self._line.p2())
             .normalized()
             .adjusted(
-                -self._tickness - self._arrow_size,
-                -self._tickness - self._arrow_size,
-                self._tickness + self._arrow_size,
-                self._tickness + self._arrow_size,
+                -self._thickness - self._arrow_size,
+                -self._thickness - self._arrow_size,
+                self._thickness + self._arrow_size,
+                self._thickness + self._arrow_size,
             )
         )
 
@@ -293,7 +289,7 @@ class Edge(QGraphicsItem):
         Draw Edge. This method is called from Edge::adjust
         """
         painter.setRenderHints(QPainter.Antialiasing)
-        painter.setPen(QPen(QColor(self._color), self._tickness, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.setPen(QPen(QColor(self._color), self._thickness, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         painter.setBrush(QBrush(self._color))
         painter.drawLine(self._line)
         painter.drawPolygon(self._arrow_head_polygon)
@@ -357,6 +353,9 @@ class GraphView(QGraphicsView):
 
         # Add nodes
         for node, node_item in self._graph.nodes(data="node_item"):
+            if node_item is None:
+                print(f"Warning: node_item is None for node: {node!r}")
+                continue
             item = Node(node_item)
             self.scene().addItem(item)
             self._nodes_map[node] = (item, node_item)

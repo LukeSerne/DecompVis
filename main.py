@@ -112,9 +112,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def _try_set_ghidra_dir(self, ghidra_dir: str) -> bool:
         """
         Try to set the Ghidra folder. If this fails (because the folder does
-        not exist or because it does not contain the decomp_dbg executable), False
-        is returned. Otherwise, the 'ghidra_dir' and 'decomp_dbg_path' variables
-        are set and True is returned.
+        not exist or because it does not contain the decomp_dbg executable),
+        False is returned. Otherwise, the 'ghidra_dir' and 'decomp_dbg_path'
+        variables are set and True is returned.
         """
         debug_path = os.path.join(ghidra_dir, self.decomp_dbg_suffix)
 
@@ -141,8 +141,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _parse_xml_file(self, file_name):
         """
-        Loads and parses the XML file the 'file_name' argument refers to. Fianally,
-        it feeds the XML into decomp_dbg.
+        Loads and parses the XML file the 'file_name' argument refers to.
+        Finally, it feeds the XML into decomp_dbg.
         """
         self.xml_path = file_name
 
@@ -160,7 +160,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             bytechunk_start = int(bytechunk.get("offset"), 16)
             # Assuming the bytes are stored in hexadecimal, the number of bytes
-            # is the number of non-whitespace characers divided by 2.
+            # is the number of non-whitespace characters divided by 2.
             bytechunk_size = len(bytechunk.text.replace(" ", "").replace("\n", "")) // 2
             bytechunk_range = range(bytechunk_start, bytechunk_start + bytechunk_size)
 

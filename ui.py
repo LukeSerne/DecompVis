@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
     QStyleOptionGraphicsItem,
     QWidget,
 )
-
 import networkx
+
 import math
 import typing
 from collections.abc import Iterator
@@ -118,7 +118,7 @@ class Node(QGraphicsObject):
         else:
             return
 
-        border_color = self._color.lighter() if self._is_selected else self._color.darker()            
+        border_color = self._color.lighter() if self._is_selected else self._color.darker()
         self._border_pen = QPen(
             border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
         )

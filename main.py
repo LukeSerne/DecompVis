@@ -35,7 +35,7 @@ class MainWindow(QtWidgets.QMainWindow):
     text_edit: QtWidgets.QTextEdit
     thread_manager: QtCore.QThreadPool
 
-    def __init__(self, extra_paths: list[pathlib.Path] = [], default_xml: typing.Optional[pathlib.Path] = None):
+    def __init__(self, extra_paths: list[pathlib.Path] = [], initial_xml: typing.Optional[pathlib.Path] = None):
         super().__init__()
 
         self.extra_paths = extra_paths
@@ -112,8 +112,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, search_dock_widget)
 
         # Load first xml if set
-        if default_xml is not None:
-            self._parse_xml_file(default_xml)
+        if initial_xml is not None:
+            self._parse_xml_file(initial_xml)
 
     def _try_set_ghidra_dir(self, ghidra_dir: pathlib.Path) -> bool:
         """
@@ -344,7 +344,7 @@ if __name__ == "__main__":
     mw = MainWindow(args.extra_paths, args.xml_file)
     mw.show()
 
-    exitcodesys = app.exec()
+    exitcode = app.exec()
     app.deleteLater()
 
-    sys.exit(exitcodesys)
+    sys.exit(exitcode)

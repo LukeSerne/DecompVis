@@ -1,7 +1,6 @@
 import networkx
 import pwn
 
-import subprocess
 from dataclasses import dataclass
 import typing
 import traceback
@@ -11,7 +10,7 @@ def find_runs(haystack: str, needles: list[str]):
     """
     A generator that yields 3-tuples (needle_type, start_idx, end_idx) for every
     run of consecutive needles of the same type in the string 'haystack'.
-    Assumes all needles are 1 character long. 
+    Assumes all needles are 1 character long.
     """
     idx = 0
 
@@ -24,7 +23,7 @@ def find_runs(haystack: str, needles: list[str]):
             break
 
         needle_idx = next_needles[needle_type]
-        
+
         for needle_end in range(needle_idx, len(haystack)):
             if haystack[needle_end] != needle_type:
                 break
@@ -89,7 +88,7 @@ def colourise_diff(diff: list[str]) -> str:
                 chunk_end = html_get_nth_char_idx(prev, offset + high_end)
                 prev = prev[:chunk_start] + f"<span style='background-color:{bg_col}'>" + prev[chunk_start:chunk_end] + "</span>" + prev[chunk_end:]
                 offset += len(f"<span style='background-color:{bg_col}'></span>")
-            
+
             table_rows.append(prev)
         else:
             print(f"Unknown prefix {prefix!r}, skipping line...")
@@ -119,7 +118,7 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
             raise ValueError(f"Unexpected response to 'restore {xml_path}': {_restore_resp.decode('utf-8')!r}")
 
         p.sendline(b"load function " + func_name.encode("utf-8"))
-        p.readline() 
+        p.readline()
 
         _load_resp = p.readuntil(b"[decomp]> ").decode("utf-8")
         # -1 is used as index to select the first element of the split if the

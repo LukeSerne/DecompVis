@@ -1,7 +1,6 @@
 from PySide6 import QtWidgets, QtGui, QtCore
 
 import sys
-import os
 import traceback
 import typing
 import xml.etree.ElementTree
@@ -11,7 +10,7 @@ import difflib
 
 from util import get_decompile_data, make_xpath_string, colourise_diff, html_escape
 from decomp import Decomp
-from ui import GraphView, ZoomSliderWidget, SearchWidget
+from ui import GraphView, ZoomSliderWidget, SearchWidget, InformationDockWidget
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -32,7 +31,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     graph_view: GraphView
     list_widget: QtWidgets.QListWidget
-    text_edit: QtWidgets.QTextEdit
     thread_manager: QtCore.QThreadPool
 
     def __init__(self, extra_paths: list[pathlib.Path] = [], initial_xml: typing.Optional[pathlib.Path] = None):
@@ -76,12 +74,7 @@ class MainWindow(QtWidgets.QMainWindow):
         list_dock_widget = QtWidgets.QDockWidget("P-CODE Stages", self)
         list_dock_widget.setWidget(self.list_widget)
 
-        self.text_edit = QtWidgets.QTextEdit(self)
-        self.text_edit.setReadOnly(True)
-        self.text_edit.setLineWrapMode(QtWidgets.QTextEdit.LineWrapMode.NoWrap)
-
-        text_dock_widget = QtWidgets.QDockWidget("Information", self)
-        text_dock_widget.setWidget(self.text_edit)
+        self.information_widget = InformationDockWidget(self)
 
         self.search_widget = SearchWidget(self.graph_view, self)
         search_dock_widget = QtWidgets.QDockWidget("Search Node", self)
@@ -108,7 +101,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.settings.setValue("decomp_dbg_path", self.decomp_dbg_path)
 
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, list_dock_widget)
-        self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, text_dock_widget)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.information_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, search_dock_widget)
 
         # Load first xml if set
@@ -296,7 +289,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ])
 
         self.list_widget.setEnabled(True)
-        self.text_edit.setEnabled(True)
+        self.information_widget.setEnabled(True)
         self.graph_view.setEnabled(True)
         self.search_widget.enable()
 
@@ -312,7 +305,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Disable some UI things to indicate we're loading
         self.list_widget.setEnabled(False)
-        self.text_edit.setEnabled(False)
+        self.information_widget.setEnabled(False)
         self.graph_view.setEnabled(False)
 
     def handle_list_change(self, new_index):
@@ -323,14 +316,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.graph_view.set_graph(state.get_graph())
 
-        full_text = ""
-
-        if new_index != 0:
+        if new_index == 0:
+            diff_text = "No diff available because there is no previous state."
+        else:
             prev_state = self.decomp.get_state(new_index - 1)
-            full_text = "<h1>Delta</h1>" + colourise_diff(difflib.ndiff(prev_state._pcode.split("\n"), state._pcode.split("\n")))
+            diff_text = colourise_diff(difflib.ndiff(prev_state._pcode.split("\n"), state._pcode.split("\n")))
 
-        full_text += "<h1>New State</h1><div><tt>" + html_escape(state._pcode).strip("\n").replace("\n", "<br/>") + "</tt></div>"
-        self.text_edit.setText(full_text)
+        pcode_text = "<tt>" + html_escape(state._pcode).strip("\n").replace("\n", "<br/>") + "</tt>"
+        self.information_widget.set_contents(pcode_text, diff_text)
 
 
 if __name__ == "__main__":

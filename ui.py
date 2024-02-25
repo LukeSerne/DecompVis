@@ -11,6 +11,7 @@ from PySide6.QtGui import (
     QTransform,
 )
 from PySide6.QtWidgets import (
+    QDockWidget,
     QGraphicsItem,
     QGraphicsObject,
     QGraphicsScene,
@@ -22,6 +23,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSlider,
     QStyleOptionGraphicsItem,
+    QTabWidget,
+    QTextEdit,
     QWidget,
 )
 import networkx
@@ -182,6 +185,7 @@ class Node(QGraphicsObject):
 
             self._bg_brush = QBrush(QColor(animation_step - self._og_bg_brush.color().red(), animation_step - self._og_bg_brush.color().green(), animation_step - self._og_bg_brush.color().blue()))
         self.update()
+
 
 class Edge(QGraphicsItem):
     def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, parent: QGraphicsItem = None):
@@ -550,3 +554,33 @@ class SearchWidget(QWidget):
         self._prev_button.setEnabled(self._search_idx != 0)
         self._next_button.setEnabled(self._search_idx != num_results - 1)
         self._status.setText(f"{self._search_idx + 1} / {num_results}")
+
+
+class InformationDockWidget(QDockWidget):
+    """
+    The widget that contains the extra information such as the
+    P-CODE and diff view as tabs.
+    """
+
+    def __init__(self, parent: QWidget):
+        super().__init__("Information", parent)
+
+        # Create the tab widget
+        self.pcode_tab = QWidget()
+        self.diff_tab = QWidget()
+        self.pcode_tab = QTextEdit(self)
+        self.diff_tab = QTextEdit(self)
+        self.diff_tab.setReadOnly(True)
+        self.pcode_tab.setReadOnly(True)
+        self.diff_tab.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        self.pcode_tab.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+
+        tab_widget = QTabWidget(self)
+        tab_widget.addTab(self.pcode_tab, "P-CODE")
+        tab_widget.addTab(self.diff_tab, "Diff")
+
+        self.setWidget(tab_widget)
+
+    def set_contents(self, pcode_text: str, diff_text: str):
+        self.pcode_tab.setText(pcode_text)
+        self.diff_tab.setText(diff_text)

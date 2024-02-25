@@ -15,9 +15,6 @@ from ui import GraphView, ZoomSliderWidget, SearchWidget
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    decomp_dbg_suffix: str = os.path.join(
-        "Ghidra", "Features", "Decompiler", "src", "decompile", "cpp", "decomp_dbg"
-    )
     load_data_done: QtCore.Signal = QtCore.Signal(Decomp)
     zoom_levels: tuple[float] = (
         0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7,
@@ -25,9 +22,10 @@ class MainWindow(QtWidgets.QMainWindow):
     )
 
     xml_func_name: str = ""
-    xml_path: str = ""
-    ghidra_dir: str = ""
-    decomp_dbg_path: str = ""
+    xml_path: typing.Optional[pathlib.Path] = None
+    ghidra_dir: typing.Optional[pathlib.Path] = None
+    extra_paths: list[pathlib.Path] = []
+    decomp_dbg_path: typing.Optional[pathlib.Path] = None
     decomp: typing.Optional[Decomp] = None
     settings: QtCore.QSettings
     zoom_idx: int = zoom_levels.index(1.0)
@@ -37,7 +35,7 @@ class MainWindow(QtWidgets.QMainWindow):
     text_edit: QtWidgets.QTextEdit
     thread_manager: QtCore.QThreadPool
 
-    def __init__(self, extra_paths = [], default_xml: typing.Optional[pathlib.Path] = None):
+    def __init__(self, extra_paths: list[pathlib.Path] = [], default_xml: typing.Optional[pathlib.Path] = None):
         super().__init__()
 
         self.extra_paths = extra_paths
@@ -52,9 +50,12 @@ class MainWindow(QtWidgets.QMainWindow):
         load_xml_act.triggered.connect(self._handle_set_xml_file)
         set_ghidra_dir_act = QtGui.QAction("Set Ghidra folder", self)
         set_ghidra_dir_act.triggered.connect(self._handle_set_ghidra_dir)
+        set_decomp_dbg_path_act = QtGui.QAction("Set decomp_dbg file", self)
+        set_decomp_dbg_path_act.triggered.connect(self._handle_set_decomp_dbg_path)
 
         file_menu.addAction(load_xml_act)
         file_menu.addAction(set_ghidra_dir_act)
+        file_menu.addAction(set_decomp_dbg_path_act)
 
         view_menu = menu_bar.addMenu("&View")
 
@@ -101,6 +102,11 @@ class MainWindow(QtWidgets.QMainWindow):
             # dir is invalid, reset ini
             self.settings.setValue("ghidra_dir", self.ghidra_dir)
 
+        decomp_dbg_path_value = self.settings.value("decomp_dbg_path")
+        if decomp_dbg_path_value is not None and not self._try_set_decomp_dbg_path(decomp_dbg_path_value):
+            # file is invalid, reset ini
+            self.settings.setValue("decomp_dbg_path", self.decomp_dbg_path)
+
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, list_dock_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, text_dock_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, search_dock_widget)
@@ -109,22 +115,34 @@ class MainWindow(QtWidgets.QMainWindow):
         if default_xml is not None:
             self._parse_xml_file(default_xml)
 
-    def _try_set_ghidra_dir(self, ghidra_dir: str) -> bool:
+    def _try_set_ghidra_dir(self, ghidra_dir: pathlib.Path) -> bool:
         """
         Try to set the Ghidra folder. If this fails (because the folder does
-        not exist or because it does not contain the decomp_dbg executable),
-        False is returned. Otherwise, the 'ghidra_dir' and 'decomp_dbg_path'
-        variables are set and True is returned.
+        not exist), False is returned. Otherwise, settings.ini is updated and
+        True is returned.
         """
-        debug_path = os.path.join(ghidra_dir, self.decomp_dbg_suffix)
-
-        if not os.path.isfile(debug_path):  # invalid path
+        if not ghidra_dir.is_dir():  # invalid path
             return False
 
         self.ghidra_dir = ghidra_dir
-        self.decomp_dbg_path = debug_path
-
         self.settings.setValue("ghidra_dir", self.ghidra_dir)
+
+        if self.decomp_dbg_path is None:
+            self._try_set_decomp_dbg_path(ghidra_dir / "Ghidra" / "Features" / "Decompiler" / "src" / "decompile" / "cpp" / "decomp_dbg")
+
+        return True
+
+    def _try_set_decomp_dbg_path(self, decomp_dbg_path: pathlib.Path) -> bool:
+        """
+        Try to set the path to the decomp_dbg executable. If this fails (because
+        the file does not exist), False is returned. Otherwise, settings.ini is
+        updated and True is returned.
+        """
+        if not decomp_dbg_path.is_file():  # invalid path
+            return False
+
+        self.decomp_dbg_path = decomp_dbg_path
+        self.settings.setValue("decomp_dbg_path", self.decomp_dbg_path)
 
         return True
 
@@ -137,9 +155,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if file_name == "":  # No XML file was selected
             return
 
-        self._parse_xml_file(file_name)
+        self._parse_xml_file(pathlib.Path(file_name))
 
-    def _parse_xml_file(self, file_name):
+    def _parse_xml_file(self, file_name: pathlib.Path):
         """
         Loads and parses the XML file the 'file_name' argument refers to.
         Finally, it feeds the XML into decomp_dbg.
@@ -204,10 +222,23 @@ class MainWindow(QtWidgets.QMainWindow):
                 self, "Choose the Ghidra Installation folder"
             )
 
-            if ghidra_dir == "":  # No folder was selected
+            if not ghidra_dir:  # No folder was selected
                 return
 
-            if self._try_set_ghidra_dir(ghidra_dir):
+            if self._try_set_ghidra_dir(pathlib.Path(ghidra_dir)):
+                return
+
+    def _handle_set_decomp_dbg_path(self):
+
+        while True:
+            decomp_dbg_path = QtWidgets.QFileDialog.getOpenFileName(
+                self, "Choose the decomp_dbg executable"
+            )[0]
+
+            if not decomp_dbg_path:  # No file was selected
+                return
+
+            if self._try_set_decomp_dbg_path(pathlib.Path(decomp_dbg_path)):
                 return
 
     def _handle_zoom_in(self, cursor_is_center: bool = False):
@@ -242,7 +273,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         try:
             pcodes = get_decompile_data(
-                self.decomp_dbg_path, self.ghidra_dir, self.xml_path, self.xml_func_name, self.extra_paths
+                str(self.decomp_dbg_path), str(self.ghidra_dir), str(self.xml_path), self.xml_func_name, self.extra_paths
             )
 
             decomp = Decomp(pcodes)
@@ -273,7 +304,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.handle_list_change(0)
 
     def load_decomp_data(self):
-        if self.ghidra_dir == "":
+        if not self.ghidra_dir or not self.decomp_dbg_path:
             # No Ghidra dir selected - don't load anything
             return
 
@@ -304,13 +335,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('xmlfile', nargs='?', help='Specify the path to an XML file to automatically load it', type=lambda p: pathlib.Path(p).absolute())
-    parser.add_argument('-s', '--extra-paths', nargs='+', help='Define extra paths to search for language definitions (.ldefs)', required=False, default=[])
-    args = parser.parse_args()
+    parser.add_argument('xml_file', nargs='?', help='Specify the path to an XML file to automatically load it', type=lambda p: pathlib.Path(p).resolve())
+    parser.add_argument('-s', '--extra-paths', nargs='+', help='Define extra paths to search for language definitions (.ldefs)', type=lambda ps: [pathlib.Path(p).resolve() for p in ps], required=False, default=[])
 
+    args = parser.parse_args()
     app = QtWidgets.QApplication(sys.argv)
 
-    mw = MainWindow(args.extra_paths, args.xmlfile)
+    mw = MainWindow(args.extra_paths, args.xml_file)
     mw.show()
 
     exitcodesys = app.exec()

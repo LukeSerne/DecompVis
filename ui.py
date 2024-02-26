@@ -318,7 +318,7 @@ class GraphView(QGraphicsView):
         self._graph_scale = 10
 
         # Map node name to Node object
-        self._nodes_map: dict[str, Node] = {}
+        self._nodes_map: dict[str, tuple[Node, typing.Any]] = {}
 
         if self._graph is not None:
             self._load_graph()
@@ -339,13 +339,15 @@ class GraphView(QGraphicsView):
         """Set the position of nodes"""
         # Compute node position from layout function
         positions = layout_algorithm(self._graph)
-        num_items = len(positions)
 
         # Change position of all nodes
         for node, pos in positions.items():
             x, y = pos
             item, _ = self._nodes_map[node]
-            item.setPos(x, y)
+            item_rect = item.boundingRect()
+            w, h = item_rect.width(), item_rect.height()
+
+            item.setPos(x - w / 2, y - h / 2)
 
     def _load_graph(self):
         """Load graph into QGraphicsScene using Node class and Edge class"""

@@ -294,7 +294,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.search_widget.enable()
 
         self._handle_update_zoom(self.zoom_levels.index(1.0))
-        self.handle_list_change(0)
+        self.list_widget.setCurrentRow(0)
 
     def load_decomp_data(self):
         if not self.ghidra_dir or not self.decomp_dbg_path:

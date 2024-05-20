@@ -108,7 +108,6 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
     command_args = zip(['-s'] * len(extra_paths), extra_paths)
     command = [decomp_path] + list(itertools.chain.from_iterable(command_args))
 
-    #with pwn.process(command, env={"SLEIGHHOME": "/home/luke/tools/ghidra_11.0.1_PUBLIC/"}) as p:
     with pwn.process(command, env={"SLEIGHHOME": ghidra_path}) as p:
         p.sendlineafter(b"[decomp]> ", f"restore {xml_path}".encode("utf-8"))
         p.readline()
@@ -151,10 +150,13 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
         p.readline()
 
         # Step through the decompilation process, one rule at a time
-        for i in itertools.count(0, 1):
+        while True:
             rule_type = p.readline()
 
             # Process the pcode
+            if rule_type == b"Decompilation complete\n":
+                break
+
             if p.readuntil(b"[decomp]> ", drop=True).endswith(b"Decompilation complete\n"):
                 break
 
@@ -167,12 +169,13 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
             )
             p.readuntil(b"[decomp]> ")
             p.readuntil(b"[decomp]> ")
-            p.readline()
+            p.readline()  # b'print raw\n'
 
             pcode = p.readuntil(b"[decomp]> ", drop=True)
-            pcodes.append((rule_type.rsplit(b" ", 1)[1].strip(), pcode))
+            rule_name = rule_type.rsplit(b" ", 1)[1].strip()
+            pcodes.append((rule_name, pcode))
 
-            p.readline()
+            p.readline()  # b'continue\n'
 
     return pcodes
 

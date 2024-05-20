@@ -148,7 +148,20 @@ class MainWindow(QtWidgets.QMainWindow):
         if file_name == "":  # No XML file was selected
             return
 
-        self._parse_xml_file(pathlib.Path(file_name))
+        try:
+            self._parse_xml_file(pathlib.Path(file_name))
+        except (ValueError, xml.etree.ElementTree.ParseError):
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Error communicating with decomp_dbg",
+                (
+                    "A fatal error occurred while communicating with the decomp_dbg "
+                    "executable. Loading this xml file has been cancelled. A "
+                    "stack trace of the exception is shown below:\n\n"
+                    f"{traceback.format_exc()}"
+                )
+            )
+
 
     def _parse_xml_file(self, file_name: pathlib.Path):
         """
@@ -263,6 +276,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _do_load_decomp_data(self):
 
         decomp = None
+        trace = ""
 
         try:
             pcodes = get_decompile_data(
@@ -271,15 +285,26 @@ class MainWindow(QtWidgets.QMainWindow):
 
             decomp = Decomp(pcodes)
         except:
-            print("Exception while loading the Decompiler data!")
-            print(traceback.format_exc())
-            if decomp is None:
-                print("Cancelling loading!")
-                return
+            trace = traceback.format_exc()
 
-        self.load_data_done.emit(decomp)
+        self.load_data_done.emit((decomp, trace))
 
-    def _process_load_decomp_data(self, decomp: Decomp):
+    def _process_load_decomp_data(self, data: tuple[Decomp, str]):
+        decomp, trace = data
+        if trace:
+            # An exception occurred - cancel loading
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Error communicating with decomp_dbg",
+                (
+                    "A fatal error occurred while communicating with the decomp_dbg "
+                    "executable. Loading this xml file has been cancelled. A "
+                    "stack trace of the exception is shown below:\n\n"
+                    f"{trace}"
+                )
+            )
+            return
+
         self.decomp = decomp
 
         self.list_widget.clear()
@@ -299,7 +324,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def load_decomp_data(self):
         if not self.ghidra_dir or not self.decomp_dbg_path:
             # No Ghidra dir selected - don't load anything
-            return
+            if not self.ghidra_dir:
+                reason = "The Ghidra Installation folder needs to be set"
+            elif not self.decomp_dbg_path:
+                reason = "The decomp_dbg executable needs to be specified"
+
+            raise ValueError(f"{reason}. Use the actions in the 'File' menu to resolve this.")
 
         self.thread_manager.start(self._do_load_decomp_data)
 

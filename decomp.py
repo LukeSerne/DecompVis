@@ -11,8 +11,8 @@ class DecompState:
     _rule_name: str
 
     def __init__(self, rule_name: bytes, pcode: bytes):
-        self._pcode = pcode.decode("utf-8").removeprefix("0\n")
-        self._rule_name = rule_name.decode("utf-8")
+        self._rule_name = rule_name.decode('utf-8')
+        self._pcode = pcode.decode('utf-8').removeprefix('0\n')
         self._init_state(self._pcode)
 
     def _init_state(self, raw_pcode: str):
@@ -68,6 +68,13 @@ class DecompState:
 
     def get_graph(self) -> networkx.DiGraph:
         return self._state
+
+    def get_pcode(self) -> str:
+        """
+        Returns a string containing the P-CODE at this point in the
+        decompilation process.
+        """
+        return self._pcode
 
 
 class Decomp:

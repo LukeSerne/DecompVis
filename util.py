@@ -214,92 +214,21 @@ def find_matching_open_paren_to_final_close_paren(string: str) -> int:
 
     return len(string) - 1 - i
 
-def grid_cell_position(G: networkx.DiGraph) -> tuple[dict["Node", tuple[float, float]], list[float]]:
-    """
-    Assuming the graph is directed and acyclic, this will return the positions
-    to plot the graph in a hierarchical layout. The edges will point downwards
-    as much as possible.
+def layout_algorithm(graph: networkx.DiGraph, layout_prog='dot') -> dict['Node', tuple[float, float]]:
+    # Create a mapping from node objects to unique string identifiers
+    node_to_str = {node: str(i) for i, node in enumerate(graph.nodes())}
+    str_to_node = {v: k for k, v in node_to_str.items()}
 
-    G: the graph (must not have a cycle)
-    """
-    # TODO: Sometimes, edges are horizontal or point upwards. This happens when
-    # a node is connected to multiple sinks and the distance of the node to the
-    # first sink is smaller than the distance of the node to a later sink.
-    # TODO: The order of the parents of a node doesn't correspond to the order
-    # of the inputs to an operation.
-    # TODO: Sometimes the super-tree of one parent uses multiple columns,
-    # displacing the super-tree of another parent. Since the other parent's
-    # super-tree is laid out in the columns to the right of the first parent,
-    # there can be a needlessly big gap between the super-trees of the parents.
-    # This is especially pronounced when the super-tree of the first parent is
-    # much larger than the super-tree of the second parent.
+    # Create a new graph with string identifiers
+    quoted_graph = networkx.DiGraph()
+    quoted_graph.add_nodes_from((node_to_str[node] for node in graph.nodes()))
+    quoted_graph.add_edges_from(((node_to_str[start], node_to_str[end]) for start, end in graph.edges()))
 
-    # Go through all parents, assign them their own columns and recursively
-    # process them.
-    def f(data: dict, sink: "Node", column_id: float, column_width: float, row_id: int) -> dict:
-        nonlocal G
+    # Use Graphviz to get the layout
+    pos = networkx.nx_pydot.pydot_layout(quoted_graph, prog=layout_prog)
 
-        # Set data for sink
-        data[sink] = (column_id, row_id)
-        parents = tuple(G.predecessors(sink))
-
-        if not parents:
-            # No parents -> end
-            return data
-
-        num_parents = len(parents)
-        parent_width = column_width / num_parents
-
-        # Pick new column ids
-        column_idx = 0
-        for parent in parents:
-            if parent in data:  # The parent has already been placed in the grid
-                continue
-
-            parent_col_id = column_id + parent_width * column_idx
-            assert column_id <= parent_col_id < column_id + parent_width * (column_idx + 1), (column_idx, column_id, parent_width, parent_col_id)
-
-            data = f(data, parent, parent_col_id, parent_width, row_id - 1)
-            column_idx += 1
-
-        return data
-
-    # Find the sink
-    sinks = [node for node, out_deg in G.out_degree() if out_deg == 0]
-    pos_data = {}
-
-    for i, sink in enumerate(sinks):
-        pos_data = f(pos_data, sink, i * 1000, 1000, 0)
-
-    columns = sorted(set(pos_data[x][0] for x in pos_data))
-    return pos_data, columns
-
-def layout_algorithm(graph: networkx.DiGraph) -> dict["Node", tuple[float, float]]:
-    """
-    Takes a directed graph and returns a mapping of nodes to their position in
-    the final layout.
-    """
-    # In general, the graph consists of several disconnected directed, acyclic
-    # graphs. To find an good layout, we will separate these components and find
-    # a layout for each component individually. Finally, we combine these
-    # layouts into a single layout.
-    layout = {}
-    num_columns = 0
-
-    column_width = 100  # width of a single column
-    row_height = 100  # height of a cell
-
-    for group_nodes in networkx.weakly_connected_components(graph):
-        group = graph.subgraph(group_nodes)
-        group_layout, group_columns = grid_cell_position(group)
-
-        # Now turn the column and row ids into actual (x, y) positions
-        for node, (col_id, row_id) in group_layout.items():
-            layout[node] = ((num_columns + group_columns.index(col_id)) * column_width, row_id * row_height)
-
-        num_columns += len(group_columns)
-
-    return layout
+    # Map string identifiers back to original nodes and flip y-axis
+    return {str_to_node[n]: (x, -y) for n, (x, y) in pos.items()}
 
 @dataclass(frozen=True)
 class AddrSpace:

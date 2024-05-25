@@ -91,11 +91,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Initialise settings ini, and load the ghidra dir
         self.settings = QtCore.QSettings("settings.ini", QtCore.QSettings.IniFormat)
         dir_value = self.settings.value("ghidra_dir")
+        decomp_dbg_path_value = self.settings.value("decomp_dbg_path")
+
         if dir_value is not None and not self._try_set_ghidra_dir(dir_value):
             # dir is invalid, reset ini
             self.settings.setValue("ghidra_dir", self.ghidra_dir)
 
-        decomp_dbg_path_value = self.settings.value("decomp_dbg_path")
         if decomp_dbg_path_value is not None and not self._try_set_decomp_dbg_path(decomp_dbg_path_value):
             # file is invalid, reset ini
             self.settings.setValue("decomp_dbg_path", self.decomp_dbg_path)

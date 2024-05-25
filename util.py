@@ -133,12 +133,12 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
         if _range_resp != b"OK (1 ranges)\n":
             raise ValueError(f"Unexpected response to 'trace address': {_range_resp.decode('utf-8')!r}")
 
-        p.sendline(b"trace break 1")
-        p.readline()
+        p.sendline(b"trace break 0")
+        p.readline()  # b'trace break 0\n'
 
         _break_resp = p.readuntil(b"[decomp]> ", drop=True)
         if _break_resp != b"OK\n":
-            raise ValueError(f"Unexpected response to 'trace break 1': {_break_resp.decode('utf-8')!r}")
+            raise ValueError(f"Unexpected response to 'trace break 0': {_break_resp.decode('utf-8')!r}")
 
         ## Start the decompilation
         pcodes = []
@@ -147,32 +147,46 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
         pcodes.append((b"Raw P-CODE", p.readuntil(b"[decomp]> ", drop=True)))
 
         p.sendline(b"decompile")
-        p.readline()
+        p.readline()  # b'decompile\n'
+        p.readline()  # b'Decompiling {function name}\n'
 
         # Step through the decompilation process, one rule at a time
-        while True:
+        done = False
+        while not done:
             rule_type = p.readline()
+            rule_name = rule_type.split(b' ', 2)[-1].strip()
 
-            # Process the pcode
-            if rule_type == b"Decompilation complete\n":
+            pcode_changes = p.readuntil(b'[decomp]> ', drop=True)
+            if b'\n\nDEBUG ' in pcode_changes:
+                # Multiple rules were executed. Unfortunately, it will be hard
+                # to isolate the changes made by individual rules, but we can at
+                # least indicate which rules are responsible for the combined
+                # changes, by having multiple names, separated by '&'.
+                get_name = lambda c: c.split(b'\n', 1)[0].split(b' ', 2)[-1].strip()
+                rule_name += b''.join([
+                    b' & ' + get_name(chunk)
+                    for chunk in pcode_changes.split(b'\n\n')[1:]
+                    if not chunk.startswith(b'Break at ')
+                ])
+
+            if not pcode_changes:
+                # No changes were made, exit immediately
                 break
 
-            if p.readuntil(b"[decomp]> ", drop=True).endswith(b"Decompilation complete\n"):
-                break
+            # Maybe the decompilation was done after these changes were made...
+            done = pcode_changes.endswith(b'Decompilation complete\n')
 
-            # We're not done yet - take another step
+            # The decompiler has been paused - get the current pcode state and
+            # set the next breakpoint.
             p.send(
                 b"trace enable\n"
-                b"trace break 1\n"
                 b"print raw\n"
                 b"continue\n"
             )
             p.readuntil(b"[decomp]> ")
-            p.readuntil(b"[decomp]> ")
             p.readline()  # b'print raw\n'
 
             pcode = p.readuntil(b"[decomp]> ", drop=True)
-            rule_name = rule_type.rsplit(b" ", 1)[1].strip()
             pcodes.append((rule_name, pcode))
 
             p.readline()  # b'continue\n'

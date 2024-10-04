@@ -137,7 +137,7 @@ def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_n
         p.readline()  # b'trace break 0\n'
 
         _break_resp = p.readuntil(b"[decomp]> ", drop=True)
-        if _break_resp != b"OK\n":
+        if _break_resp != b"":
             raise ValueError(f"Unexpected response to 'trace break 0': {_break_resp.decode('utf-8')!r}")
 
         ## Start the decompilation

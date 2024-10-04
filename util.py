@@ -321,7 +321,7 @@ class Identifier:
                 try:
                     Identifier.from_raw(part[1:-1])
                 except:
-                    print(f"Warning: Unexpected parenthesised group at the end of varnode: {name!r}")
+                    print(f"Warning: Unexpected parenthesised group at the end of varnode: {name!r} - {part[1:-1]}")
                     traceback.format_exc()
 
             name = name[:start_idx]
@@ -333,7 +333,7 @@ class Identifier:
             if ":" in name:
                 name, size_ = name.rsplit(":", 1)
                 try:
-                    size = int(size_)
+                    size = int(size_, 16)
                 except ValueError:
                     # This was probably a function name / storage location with a
                     # colon in it.
@@ -511,13 +511,13 @@ class InstructionReference:
 
     @staticmethod
     def from_raw(name: str) -> "InstructionReference":
-        ident = Identifier.from_raw(name, no_size=True)
+        ident = Identifier.from_raw(name, no_size=name.count(':') != 2)
         assert ident._space_shortcut == "i", (name, ident)
-        assert ident._size is None, (name, ident)
+        assert name.count(':') == 2 or ident._size is None, (name, ident)
         return InstructionReference(ident)
 
     def get_node_name(self) -> str:
-        return f"REF {self._target}"
+        return f"INSTRUCTION REF"
 
     def get_color_name(self) -> str:
         return "blue"

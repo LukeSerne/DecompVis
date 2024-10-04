@@ -19,7 +19,7 @@ class DecompState:
         # Create a data flow graph out of the given operations
 
         edges_to_create: list[
-            tuple[str | Identifier | AddrSpace, str | Identifier | Operation]
+            tuple[tuple[int, int] | InstructionReference | Identifier | AddrSpace, tuple[int, int] | InstructionReference | Identifier]
         ] = []
 
         operations = [

@@ -778,10 +778,33 @@ class Operation:
             if "(" in parts[3]:
                 op_name, args = parts[3].split("(", 1)
 
+                def disambiguate_numbers(s: str) -> tuple[str, str]:
+                    numbers = op_name[6:]
+                    if len(s) == 2:
+                        return (s[0], s[1])
+
+                    # This is an ugly hack that guesses that one of the two
+                    # numbers is a power of two. That seems to disambiguate
+                    # correctly most of the time, but there's no guarantee
+                    # it works. It'd be really great if the numbers were not
+                    # printed in an ambiguous way...
+                    if len(s) == 3:
+                        n = int(s[:2])
+                        if n & (n - 1) == 0 and n != 0:
+                            return (s[:2], s[2])
+                        return (s[0], s[-2:])
+
+                    if len(s) == 4:
+                        return (s[:2], s[2:])
+
+                    raise ValueError(f"Unexpected numbers string: {s!r}")
+
                 if op_name.startswith("ZEXT"):
-                    _op = f"INT_ZEXT({op_name[4]}, {op_name[5]})"
+                    numbers = disambiguate_numbers(op_name[4:])
+                    _op = f"INT_ZEXT({numbers[0]}, {numbers[1]})"
                 elif op_name.startswith("SEXT"):
-                    _op = f"INT_SEXT({op_name[4]}, {op_name[5]})"
+                    numbers = disambiguate_numbers(op_name[4:])
+                    _op = f"INT_SEXT({numbers[0]}, {numbers[1]})"
                 elif op_name.startswith("CARRY"):
                     _op = f"INT_CARRY({op_name[5:]})"
                 elif op_name.startswith("SCARRY"):
@@ -789,9 +812,11 @@ class Operation:
                 elif op_name.startswith("SBORROW"):
                     _op = f"INT_SBORROW({op_name[7:]})"
                 elif op_name.startswith("CONCAT"):
-                    _op = f"PIECE({op_name[6]}, {op_name[7]})"
+                    numbers = disambiguate_numbers(op_name[6:])
+                    _op = f"PIECE({numbers[0]}, {numbers[1]})"
                 elif op_name.startswith("SUB"):
-                    _op = f"SUBPIECE({op_name[3]}, {op_name[4]})"
+                    numbers = disambiguate_numbers(op_name[3:])
+                    _op = f"SUBPIECE({numbers[0]}, {numbers[1]})"
                 elif op_name in op_trans_dict:
                     _op = op_trans_dict[op_name]
 

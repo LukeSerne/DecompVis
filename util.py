@@ -599,9 +599,9 @@ class Operation:
             call_part = parts[1] if not has_out else parts[3]
             function = parts[2] if not has_out else parts[4]
 
-            # How do we even differentiate between call fName(<addr>) [no args]
-            # and fName(<varnode>) [has args]?
-            has_args = "," in function  # BUG: fdBc_c::isFoot:8(free)(r3(0x800b86ec:204)) is not detected as having args
+            # Try to differentiate between call fName(<addr>) and fName(free)
+            split_idx = find_matching_open_paren_to_final_close_paren(function)
+            has_args = function[split_idx:] not in ('(free)', '(i)')
 
             _op = "CALL" if call_part == "call" else "CALLIND"
 

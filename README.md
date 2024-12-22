@@ -1,6 +1,8 @@
 # DecompVis - Ghidra Decompilation Visualisation
 DecompVis is a Python application that aims to provide insight in the internal process Ghidra's Decompiler uses to transform raw P-CODE into "high" P-CODE, which is ultimately used to provide the decompiled output.
 
+![](./img/ui.png)
+
 ## Background
 When Ghidra needs to decompile a piece of assembly code, the code is first translated into an intermediate language, called P-CODE. At this stage, the P-CODE is also called "Raw P-CODE". P-CODE is a simple register transfer language where operations operate on variables called "Varnodes". Next, a data flow graph is constructed from these instructions, where the varnodes and operations are represented by nodes, and there is an edge between a varnode and an operation if that varnode is used as input or output for that operation.
 

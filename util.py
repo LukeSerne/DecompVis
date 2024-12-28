@@ -238,6 +238,9 @@ def layout_algorithm(graph: networkx.DiGraph, layout_prog='dot') -> dict['Node',
     quoted_graph.add_nodes_from((node_to_str[node] for node in graph.nodes()))
     quoted_graph.add_edges_from(((node_to_str[start], node_to_str[end]) for start, end in graph.edges()))
 
+    # Give nodes a size of 1, to reduce overlapping nodes in the final layout
+    networkx.set_node_attributes(quoted_graph, {node_to_str[node]: {'height': 1, 'width': 1} for node in graph.nodes()})
+
     # Use Graphviz to get the layout
     pos = networkx.nx_pydot.pydot_layout(quoted_graph, prog=layout_prog)
 

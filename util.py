@@ -665,11 +665,6 @@ class Operation:
         # CPOOLREF and NEW are 'Pseudo P-CODE Operations' and are documented
         # here:
         # https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/GhidraDocs/languages/html/pseudo-ops.html
-
-        # USERDEFINED is also a pseudo P-CODE op, but its ::printRaw method can
-        # output pretty much anything, so it's much harder to parse. I just
-        # assume it is the only thing that reaches here that has only 2 parts.
-
         if parts[1].startswith("cpoolref_") or (num_parts >= 4 and parts[3].startswith("cpoolref_")):  # TypeOpCpoolref
             # Retrieves a constant from the constant pool
             _op = "CPOOLREF"
@@ -702,10 +697,27 @@ class Operation:
 
             return Operation(full_line, addr, False, _op, _in, _out)
 
+        # USERDEFINED is also a pseudo P-CODE op, but its ::printRaw method can
+        # output pretty much anything, so it's much harder to parse. I just
+        # assume it is the only thing that reaches here that has only 2 parts.
         if num_parts == 2:
-            # A user-defined operation. Pretend it's an empty line
-            print(f"Ignoring user-defined operation: {parts[1]!r}")
-            return Operation(full_line, addr, True, "", _in, None)
+            # Attempt to parse the operation as a function call. Example:
+            #   parts = ['0x020f83fc:45:', 'callindr0(0x020f83e8:3f)(r3(0x020f83e0:3b),#0x10026450,#0x1)']
+            function = parts[1]
+
+            # Try to differentiate between call fName(<addr>) and fName(free)
+            split_idx = find_matching_open_paren_to_final_close_paren(function)
+            has_args = function[split_idx:] not in ('(free)', '(i)')
+
+            if has_args:
+                name, args = function[:split_idx], function[split_idx:][1:-1]
+
+                func_name = Identifier.from_raw(name)
+                _in = [func_name] + [Identifier.from_raw(i) for i in args.split(',')]
+            else:
+                _in = [Identifier.from_raw(function)]
+
+            return Operation(full_line, addr, False, 'USERDEFINED', _in, None)
 
         assert num_parts > 2 and parts[2] == "=", parts
 

@@ -197,7 +197,7 @@ class Edge(QGraphicsItem):
         self._is_dotted = is_dotted
 
         self._thickness = 2
-        self._color = "#2BB53C"
+        self._color = '#2B42E3' if self._is_dotted else '#2BB53C'
         self._arrow_size = 15
 
         self._source.add_edge(self)

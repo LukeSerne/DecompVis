@@ -56,11 +56,11 @@ class DecompState:
                 if isinstance(inp, InstructionReference):
                     # Special case for instruction references - Add extra edge
                     # to reference target.
-                    # TODO: Maybe make this a dotted line?
-                    if inp._target._seq_num is None:
+                    target = inp._target._seq_num
+                    if target is None:
                         print(f"Warning: Instruction reference to None: {inp}")
                     else:
-                        edges_to_create.append((inp._target._seq_num, inp))
+                        edges_to_create.append((target, inp, {'dotted': True}))
 
                 edges_to_create.append((inp, op._addr))
 

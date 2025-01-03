@@ -188,12 +188,13 @@ class Node(QGraphicsObject):
 
 
 class Edge(QGraphicsItem):
-    def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, parent: QGraphicsItem = None):
+    def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, is_dotted: bool, parent: QGraphicsItem = None):
         super().__init__(parent)
         self._source = source
         self._dest = dest
         self._dest_index = dest_index
         self._dest_num_inputs = dest_num_inputs
+        self._is_dotted = is_dotted
 
         self._thickness = 2
         self._color = "#2BB53C"
@@ -292,11 +293,13 @@ class Edge(QGraphicsItem):
 
         Draw Edge. This method is called from Edge::adjust
         """
-        painter.setRenderHints(QPainter.Antialiasing)
-        painter.setPen(QPen(QColor(self._color), self._thickness, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.setRenderHints(QPainter.RenderHint.Antialiasing)
+        pen_style = Qt.PenStyle.DashLine if self._is_dotted else Qt.PenStyle.SolidLine
+        painter.setPen(QPen(QColor(self._color), self._thickness, pen_style, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         painter.setBrush(QBrush(self._color))
         painter.drawLine(self._line)
-        painter.drawPolygon(self._arrow_head_polygon)
+        if not self._is_dotted:
+            painter.drawPolygon(self._arrow_head_polygon)
 
 
 class GraphView(QGraphicsView):
@@ -367,7 +370,7 @@ class GraphView(QGraphicsView):
             self._nodes_map[node] = (item, node_item)
 
         # Add edges
-        for a, b in self._graph.edges:
+        for a, b, dotted in self._graph.edges.data('dotted', default=False):
             source, source_item = self._nodes_map[a]
             dest, dest_item = self._nodes_map[b]
 
@@ -380,7 +383,7 @@ class GraphView(QGraphicsView):
                 offset = 0
                 slots = 1
 
-            self.scene().addItem(Edge(source, dest, offset, slots))
+            self.scene().addItem(Edge(source, dest, offset, slots, dotted))
 
     def get_nodes(self) -> Iterator[Node]:
         """

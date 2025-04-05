@@ -89,7 +89,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.load_data_done.connect(self._process_load_decomp_data)
 
         # Initialise settings ini, and load the ghidra dir
-        self.settings = QtCore.QSettings("settings.ini", QtCore.QSettings.IniFormat)
+        self.settings = QtCore.QSettings(str(pathlib.Path(__file__).parent / 'settings.ini'), QtCore.QSettings.IniFormat)
         dir_value = self.settings.value("ghidra_dir")
         decomp_dbg_path_value = self.settings.value("decomp_dbg_path")
 

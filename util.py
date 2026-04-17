@@ -246,7 +246,10 @@ def layout_algorithm(graph: networkx.DiGraph, layout_prog='dot') -> dict['Node',
     networkx.set_node_attributes(quoted_graph, {node_to_str[node]: {'height': 1, 'width': 1} for node in graph.nodes()})
 
     # Use Graphviz to get the layout
-    pos = networkx.nx_pydot.pydot_layout(quoted_graph, prog=layout_prog)
+    try:
+        pos = networkx.nx_pydot.pydot_layout(quoted_graph, prog=layout_prog)
+    except FileNotFoundError as e:
+        raise ValueError(f'{e}\nIt seems GraphViz is not installed (correctly). Installation instructions: https://graphviz.org/download/')
 
     # Map string identifiers back to original nodes and flip y-axis
     return {str_to_node[n]: (x, -y) for n, (x, y) in pos.items()}

@@ -25,7 +25,11 @@ class DecompState:
         operations = [
             Operation.from_raw(line.replace("\t", " ").encode("utf-8"))
             for line in raw_pcode.split("\n")
-            if line and not line.startswith("Basic Block")
+            # Avoid creating operations for basic block / fallthrough information
+            if line and not (
+                line.startswith('Basic Block')  # basic block start
+                or '\t[ goto Block_' in line  # fallthrough indication
+            )
         ]
 
         self._state = networkx.DiGraph()

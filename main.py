@@ -325,12 +325,13 @@ class MainWindow(QtWidgets.QMainWindow):
     def load_decomp_data(self):
         if not self.ghidra_dir or not self.decomp_dbg_path:
             # No Ghidra dir selected - don't load anything
+            reasons = []
             if not self.ghidra_dir:
-                reason = "The Ghidra Installation folder needs to be set"
-            elif not self.decomp_dbg_path:
-                reason = "The decomp_dbg executable needs to be specified"
+                reasons.append('the Ghidra Installation folder needs to be set')
+            if not self.decomp_dbg_path:
+                reasons.append('the decomp_dbg executable needs to be specified')
 
-            raise ValueError(f"{reason}. Use the actions in the 'File' menu to resolve this.")
+            raise ValueError(f"{' and '.join(reasons).capitalize()}. Use the actions in the 'File' menu to resolve this.")
 
         self.thread_manager.start(self._do_load_decomp_data)
 

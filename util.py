@@ -65,33 +65,37 @@ def colourise_diff(diff: list[str]) -> str:
     as produced by difflib. The returned string contains a HTML description of a
     table with the changed parts of the diff highlighted.
     """
-    table_rows = []
+    table_rows: list[str] = []
+    ADD_COLOUR = '#e6ffec'  # light green
+    REM_COLOUR = '#ffebe9'  # light red
+    BOLD_ADD_COLOUR = '#abf2bc'  # green
+    BOLD_REM_COLOUR = '#ffc0c0'  # red
 
     for line in diff:
         prefix, line = line[:2], line[2:]
         escaped_line = html_escape(line)
 
-        if prefix == "  ":
-            table_rows.append(f"<td><tt>{escaped_line}</tt></td>")
-        elif prefix == "+ ":
-            table_rows.append(f"<td bgcolor='#e6ffec'><tt>{escaped_line}</tt></td>")
-        elif prefix == "- ":
-            table_rows.append(f"<td bgcolor='#ffebe9'><tt>{escaped_line}</tt></td>")
-        elif prefix == "? ":
-            offset = len("<td bgcolor='#ffebe9'><tt>")
+        if prefix == '  ':  # Line is unchanged
+            table_rows.append(f'<td><tt>{escaped_line}</tt></td>')
+        elif prefix == '+ ':  # Line has been added
+            table_rows.append(f"<td bgcolor='{ADD_COLOUR}'><tt>{escaped_line}</tt></td>")
+        elif prefix == '- ':  # Line has been removed
+            table_rows.append(f"<td bgcolor='{REM_COLOUR}'><tt>{escaped_line}</tt></td>")
+        elif prefix == '? ':  # Line has been partially changed
+            offset = len(f"<td bgcolor='{REM_COLOUR}'><tt>")
             prev = table_rows.pop()
-            prev_is_add = prev.startswith("<td bgcolor='#e6ffec'>")
+            prev_is_add = prev.startswith(f"<td bgcolor='{ADD_COLOUR}'>")
 
-            for run_type, high_start, high_end in find_runs(line, ("^", "-", "+")):
-                bg_col = "#abf2bc" if prev_is_add else "#ffc0c0"
+            for run_type, high_start, high_end in find_runs(line, ['^', '-', '+']):
+                bg_col = BOLD_ADD_COLOUR if prev_is_add else BOLD_REM_COLOUR
                 chunk_start = html_get_nth_char_idx(prev, offset + high_start)
                 chunk_end = html_get_nth_char_idx(prev, offset + high_end)
-                prev = prev[:chunk_start] + f"<span style='background-color:{bg_col}'>" + prev[chunk_start:chunk_end] + "</span>" + prev[chunk_end:]
+                prev = f"{prev[:chunk_start]}<span style='background-color:{bg_col}'>{prev[chunk_start:chunk_end]}</span>{prev[chunk_end:]}"
                 offset += len(f"<span style='background-color:{bg_col}'></span>")
 
             table_rows.append(prev)
         else:
-            print(f"Unknown prefix {prefix!r}, skipping line...")
+            raise ValueError(f'Unknown prefix {prefix!r}')
 
     return "<table width='100%'><tr>" + "</tr><tr>".join(table_rows) + "</tr></table>"
 

@@ -95,11 +95,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if dir_value is not None and not self._try_set_ghidra_dir(dir_value):
             # dir is invalid, reset ini
+            self.ghidra_dir = None
             self.settings.setValue("ghidra_dir", self.ghidra_dir)
+            QtWidgets.QMessageBox.critical(
+                None,
+                'Invalid Ghidra path in settings',
+                (
+                    'The Ghidra path saved in the settings.ini was not valid. '
+                    f'The path was set to {dir_value!r}. '
+                    'It has been removed from the settings.ini file. You should '
+                    'set it again by going to \'File\' > \'Set Ghidra Folder\'.'
+                ),
+            )
 
         if decomp_dbg_path_value is not None and not self._try_set_decomp_dbg_path(decomp_dbg_path_value):
             # file is invalid, reset ini
+            self.decomp_dbg_path = None
             self.settings.setValue("decomp_dbg_path", self.decomp_dbg_path)
+            QtWidgets.QMessageBox.critical(
+                None,
+                'Invalid decomp_dbg path in settings',
+                (
+                    'The decomp_dbg path saved in the settings.ini was not valid. '
+                    f'The path was set to {decomp_dbg_path_value!r}. '
+                    'It has been removed from the settings.ini file. You should '
+                    'set it again by going to \'File\' > \'Set decomp_dbg file\'.'
+                ),
+            )
 
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, list_dock_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.information_widget)
@@ -117,6 +139,24 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         if not ghidra_dir.is_dir():  # invalid path
             return False
+
+        if not (ghidra_dir / 'Ghidra').is_dir():  # weird path
+            button = QtWidgets.QMessageBox.StandardButton
+            result = QtWidgets.QMessageBox.warning(
+                None,
+                'Weird Ghidra path',
+                (
+                    'The supplied path does not seem like the root folder of a '
+                    'Ghidra installation. Make sure to select the folder '
+                    'containing the \'Ghidra\' and \'Extensions\' folder.\n\n'
+                    'Do you want to continue regardless?'
+                ),
+                button.Yes | button.No,
+                button.No
+            )
+
+            if result == button.No:  # aborted by user
+                return False
 
         self.ghidra_dir = ghidra_dir
         self.settings.setValue("ghidra_dir", self.ghidra_dir)
@@ -151,7 +191,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         try:
             self._parse_xml_file(pathlib.Path(file_name))
-        except (ValueError, xml.etree.ElementTree.ParseError):
+        except ValueError:
             QtWidgets.QMessageBox.critical(
                 None,
                 "Error communicating with decomp_dbg",
@@ -160,6 +200,16 @@ class MainWindow(QtWidgets.QMainWindow):
                     "executable. Loading this xml file has been cancelled. A "
                     "stack trace of the exception is shown below:\n\n"
                     f"{traceback.format_exc()}"
+                )
+            )
+        except xml.etree.ElementTree.ParseError:
+            QtWidgets.QMessageBox.critical(
+                None,
+                'Error parsing XML',
+                (
+                    'A fatal error occurred while parsing the provided XML file. '
+                    f'Are you sure {file_name!r} is a valid XML file?\n\n'
+                    f'{traceback.format_exc()}'
                 )
             )
 
@@ -331,7 +381,14 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.decomp_dbg_path:
                 reasons.append('the decomp_dbg executable needs to be specified')
 
-            raise ValueError(f"{' and '.join(reasons).capitalize()}. Use the actions in the 'File' menu to resolve this.")
+            # Show an error dialog box and return
+            QtWidgets.QMessageBox.critical(
+                None,
+                'Error while loading XML file',
+                f'{" and ".join(reasons).capitalize()}. Use the actions in the \'File\' menu to resolve this.'
+            )
+
+            return
 
         self.thread_manager.start(self._do_load_decomp_data)
 

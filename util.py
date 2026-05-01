@@ -34,10 +34,10 @@ def find_runs(haystack: str, needles: list[str]):
 def html_escape(text: str) -> str:
     """
     Returns the HTML-escaped version of a string. This function replaces the
-    characters '<', '>' and '&' with their respective HTML escape sequences.
+    characters '<', '>', '&' and '\n' with their respective HTML escape sequences.
     Assumes the input does not contain any HTML escape sequences.
     """
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br/>')
 
 def html_get_nth_char_idx(target_str: str, n: int) -> int:
     """
@@ -373,7 +373,7 @@ class Identifier:
                 addr_part = data
                 plus_part = 0
 
-            if len(addr_part) not in (4, 6, 8, 10, 14): return
+            if len(addr_part) not in {4, 6, 8, 10, 14}: return
             addr_part = int(addr_part[2:], 16)
 
             return f"{addr_part:#x}+{plus_part}"
@@ -386,7 +386,7 @@ class Identifier:
             name = f"{int(name[1:], 16):#x}"
             is_parsed = True
 
-        elif space_shortcut in r"%o":  # IPTR_PROCESSOR
+        elif space_shortcut in {'%', 'o'}:  # IPTR_PROCESSOR
             # %: register
             # o: other
             # ???
@@ -609,10 +609,6 @@ class Operation:
             call_part = parts[1] if not has_out else parts[3]
             function = parts[2] if not has_out else parts[4]
 
-            # Try to differentiate between call fName(<addr>) and fName(free)
-            split_idx = find_matching_open_paren_to_final_close_paren(function)
-            has_args = function[split_idx:] not in ('(free)', '(i)')
-
             _op = "CALL" if call_part == "call" else "CALLIND"
 
             if has_out:
@@ -621,8 +617,11 @@ class Operation:
             else:
                 _out = None
 
+            # Try to differentiate between call fName(<addr>) and fName(free)
+            split_idx = find_matching_open_paren_to_final_close_paren(function)
+            has_args = function[split_idx:] not in ('(free)', '(i)')
+
             if has_args:
-                split_idx = find_matching_open_paren_to_final_close_paren(function)
                 name, args = function[:split_idx], function[split_idx:][1:-1]
 
                 func_name = Identifier.from_raw(name)
@@ -644,8 +643,11 @@ class Operation:
             else:
                 _out = None
 
+            # Try to differentiate between call syscall(<addr>) and syscall(free)
+            split_idx = find_matching_open_paren_to_final_close_paren(function)
+            has_args = function[split_idx:] not in ('(free)', '(i)')
+
             if has_args:
-                split_idx = find_matching_open_paren_to_final_close_paren(function)
                 name, args = function[:split_idx], function[split_idx:][1:-1]
 
                 func_name = Identifier.from_raw(name)
@@ -653,7 +655,7 @@ class Operation:
             else:
                 _in = [Identifier.from_raw(function)]
 
-            return Operation(full_line, addr, False, _op, _in, _out)
+            return Operation(full_line, addr, False, 'CALLOTHER', _in, _out)
 
         if parts[1] == "segmentop" or (num_parts >= 4 and parts[3] == "segmentop"):  # TypeOpSegment
             _op = "SEGMENTOP"

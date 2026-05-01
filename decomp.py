@@ -80,6 +80,13 @@ class DecompState:
         """
         return self._pcode
 
+    def get_pcode_lines(self) -> list[str]:
+        '''
+        Returns a list containing the lines of P-CODE at this point in the
+        decompilation process.
+        '''
+        return self._pcode.strip('\n').split('\n')
+
 
 class Decomp:
     _states: list[DecompState]

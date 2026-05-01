@@ -406,12 +406,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.graph_view.set_graph(state.get_graph())
 
         if new_index == 0:
-            diff_text = "<i>No diff available because there is no previous state.</i>"
+            diff_text = '<i>No diff available because there is no previous state.</i>'
         else:
             prev_state = self.decomp.get_state(new_index - 1)
-            diff_text = colourise_diff(difflib.ndiff(prev_state.get_pcode().split("\n"), state.get_pcode().split("\n")))
+            diff_text = colourise_diff(
+                difflib.ndiff(
+                    prev_state.get_pcode_lines(),
+                    state.get_pcode_lines()
+                )
+            )
 
-        pcode_text = "<tt>" + html_escape(state.get_pcode()).strip("\n").replace("\n", "<br/>") + "</tt>"
+        pcode_text = '<tt>' + html_escape(state.get_pcode().strip('\n')) + '</tt>'
         self.information_widget.set_contents(pcode_text, diff_text)
 
 

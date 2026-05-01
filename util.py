@@ -51,8 +51,10 @@ def html_get_nth_char_idx(target_str: str, n: int) -> int:
         if n == 0:
             return i
 
-        if target_str[i] == "&":  # html escape sequences, skip until ';'
-            i = target_str.find(";", i)
+        if target_str[i] == '&':  # html escape sequences, skip until ';'
+            i = target_str.find(';', i)
+            if i == -1:
+                raise ValueError(f'String {target_str!r} contains invalid escape sequence')
 
         i += 1
         n -= 1
@@ -78,26 +80,26 @@ def colourise_diff(diff: list[str]) -> str:
         if prefix == '  ':  # Line is unchanged
             table_rows.append(f'<td><tt>{escaped_line}</tt></td>')
         elif prefix == '+ ':  # Line has been added
-            table_rows.append(f"<td bgcolor='{ADD_COLOUR}'><tt>{escaped_line}</tt></td>")
+            table_rows.append(f'<td bgcolor={ADD_COLOUR!r}><tt>{escaped_line}</tt></td>')
         elif prefix == '- ':  # Line has been removed
-            table_rows.append(f"<td bgcolor='{REM_COLOUR}'><tt>{escaped_line}</tt></td>")
+            table_rows.append(f'<td bgcolor={REM_COLOUR!r}><tt>{escaped_line}</tt></td>')
         elif prefix == '? ':  # Line has been partially changed
-            offset = len(f"<td bgcolor='{REM_COLOUR}'><tt>")
+            offset = len(f'<td bgcolor={REM_COLOUR!r}><tt>')
             prev = table_rows.pop()
-            prev_is_add = prev.startswith(f"<td bgcolor='{ADD_COLOUR}'>")
+            prev_is_add = prev.startswith(f'<td bgcolor={ADD_COLOUR!r}>')
 
             for run_type, high_start, high_end in find_runs(line, ['^', '-', '+']):
                 bg_col = BOLD_ADD_COLOUR if prev_is_add else BOLD_REM_COLOUR
                 chunk_start = html_get_nth_char_idx(prev, offset + high_start)
                 chunk_end = html_get_nth_char_idx(prev, offset + high_end)
-                prev = f"{prev[:chunk_start]}<span style='background-color:{bg_col}'>{prev[chunk_start:chunk_end]}</span>{prev[chunk_end:]}"
-                offset += len(f"<span style='background-color:{bg_col}'></span>")
+                prev = f'{prev[:chunk_start]}<span style="background-color:{bg_col}">{prev[chunk_start:chunk_end]}</span>{prev[chunk_end:]}'
+                offset += len(f'<span style="background-color:{bg_col}"></span>')
 
             table_rows.append(prev)
         else:
             raise ValueError(f'Unknown prefix {prefix!r}')
 
-    return "<table width='100%'><tr>" + "</tr><tr>".join(table_rows) + "</tr></table>"
+    return '<table width="100%"><tr>' + '</tr><tr>'.join(table_rows) + '</tr></table>'
 
 def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str, extra_paths: list[str]) -> list[tuple[bytes, bytes]]:
     """
@@ -522,15 +524,15 @@ class InstructionReference:
     @staticmethod
     def from_raw(name: str) -> "InstructionReference":
         ident = Identifier.from_raw(name, no_size=name.count(':') != 2)
-        assert ident._space_shortcut == "i", (name, ident)
+        assert ident._space_shortcut == 'i', (name, ident)
         assert name.count(':') == 2 or ident._size is None, (name, ident)
         return InstructionReference(ident)
 
     def get_node_name(self) -> str:
-        return f"INSTRUCTION REF"
+        return 'INSTRUCTION REF'
 
     def get_color_name(self) -> str:
-        return "blue"
+        return 'blue'
 
     def get_tooltip_text(self) -> typing.Optional[str]:
         return None
@@ -632,10 +634,8 @@ class Operation:
             return Operation(full_line, addr, False, _op, _in, _out)
 
         if parts[1] == "syscall" or (num_parts >= 4 and parts[3] == "syscall"):  # TypeOpCallother
-            _op = "CALLOTHER"
-            has_out = parts[3] == "syscall"
+            has_out = num_parts >= 4
             function = parts[4] if has_out else parts[2]
-            has_args = "," in function  # BUG: fName(arg) is not detected as having args
 
             if has_out:
                 _out = Identifier.from_raw(parts[1])
@@ -657,54 +657,50 @@ class Operation:
 
             return Operation(full_line, addr, False, 'CALLOTHER', _in, _out)
 
-        if parts[1] == "segmentop" or (num_parts >= 4 and parts[3] == "segmentop"):  # TypeOpSegment
-            _op = "SEGMENTOP"
-            has_out = parts[3] == "segmentop"
+        if parts[1] == 'segmentop' or (num_parts >= 4 and parts[3] == 'segmentop'):  # TypeOpSegment
+            has_out = num_parts >= 4
             function = parts[4] if has_out else parts[2]
 
             if has_out:
                 _out = Identifier.from_raw(parts[1])
-                assert parts[2] == "=", parts
+                assert parts[2] == '=', parts
             else:
                 _out = None
 
-            _in = [Identifier.from_raw(i) for i in function[len("segmentop("):-1].split(",")]
-            return Operation(full_line, addr, False, _op, _in, _out)
+            _in = [Identifier.from_raw(i) for i in function[len('segmentop('):-1].split(',')]
+            return Operation(full_line, addr, False, 'SEGMENTOP', _in, _out)
 
         # CPOOLREF and NEW are 'Pseudo P-CODE Operations' and are documented
         # here:
         # https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/GhidraDocs/languages/html/pseudo-ops.html
-        if parts[1].startswith("cpoolref_") or (num_parts >= 4 and parts[3].startswith("cpoolref_")):  # TypeOpCpoolref
+        if parts[1].startswith('cpoolref_') or (num_parts >= 4 and parts[3].startswith('cpoolref_')):  # TypeOpCpoolref
             # Retrieves a constant from the constant pool
-            _op = "CPOOLREF"
-
-            has_out = parts[3].startswith("cpoolref_")
+            has_out = num_parts >= 4
             function = parts[3] if has_out else parts[1]
 
             if has_out:
                 _out = Identifier.from_raw(parts[1])
-                assert parts[2] == "=", parts
+                assert parts[2] == '=', parts
             else:
                 _out = None
 
-            _in = [Identifier.from_raw(i) for i in function.split("(", 1)[1][:-1].split(",")]
+            _in = [Identifier.from_raw(i) for i in function.split('(', 1)[1][:-1].split(',')]
             _in.insert(1, None)  # BUG? input 1 (type of value to return) is not printed?
-            return Operation(full_line, addr, False, _op, _in, _out)
+            return Operation(full_line, addr, False, 'CPOOLREF', _in, _out)
 
-        if parts[1].startswith("new(") or (num_parts >= 4 and parts[3].startswith("new(")):  # TypeOpNew
-            _op = "NEW"
-            has_out = parts[3].startswith("new(")
+        if parts[1].startswith('new(') or (num_parts >= 4 and parts[3].startswith('new(')):  # TypeOpNew
+            has_out = num_parts >= 4
             function = parts[4] if has_out else parts[2]
 
             if has_out:
                 _out = Identifier.from_raw(parts[1])
-                assert parts[2] == "=", parts
+                assert parts[2] == '=', parts
             else:
                 _out = None
 
-            _in = [Identifier.from_raw(i) for i in function[len("new("):-1].split(",")]
+            _in = [Identifier.from_raw(i) for i in function[len('new('):-1].split(',')]
 
-            return Operation(full_line, addr, False, _op, _in, _out)
+            return Operation(full_line, addr, False, 'NEW', _in, _out)
 
         # USERDEFINED is also a pseudo P-CODE op, but its ::printRaw method can
         # output pretty much anything, so it's much harder to parse. I just
@@ -741,43 +737,39 @@ class Operation:
         _out = Identifier.from_raw(parts[1])
 
         if num_parts >= 6 and parts[4] == "?" and num_parts % 2 == 0:  # TypeOpMulti
-            _op = "MULTIEQUAL"
             _in = [Identifier.from_raw(i) for i in parts[3::2]]
-            return Operation(full_line, addr, False, _op, _in, _out)
+            return Operation(full_line, addr, False, 'MULTIEQUAL', _in, _out)
 
-        if parts[3] == "[create]" or (num_parts >= 5 and parts[4] == "[]"):  # TypeOpIndirect
-            _op = "INDIRECT"
-
-            if parts[3] == "[create]":
-                # <out> = [create] <in1>
+        if parts[3] == '[create]' or (num_parts >= 6 and parts[4] == '[]'):  # TypeOpIndirect
+            if parts[3] == '[create]':
+                # <addr>: <out> = [create] <in1>
                 # While in0 is not specified, from the documentation, we know
                 # that it is a constant varnode with value 0.
-                _in = [Identifier.from_raw("#0x0"), InstructionReference.from_raw(parts[4])]
+                _in = [Identifier.from_raw('#0x0'), InstructionReference.from_raw(parts[4])]
             else:
-                # <out> = <in0> [] <in1>
+                assert num_parts == 6, parts
+                # <addr>: <out> = <in0> [] <in1>
                 _in = [Identifier.from_raw(parts[3]), InstructionReference.from_raw(parts[5])]
 
-            return Operation(full_line, addr, False, _op, _in, _out)
+            return Operation(full_line, addr, False, 'INDIRECT', _in, _out)
 
-        if parts[3] == "(cast)":  # TypeOpCast
-            return Operation(full_line, addr, False, "CAST", [Identifier.from_raw(parts[4])], _out)
+        if parts[3] == '(cast)':  # TypeOpCast
+            return Operation(full_line, addr, False, 'CAST', [Identifier.from_raw(parts[4])], _out)
 
-        if parts[3].startswith("*("):  # TypeOpLoad
-            _op = "LOAD"
-
-            in0_space_name, in1 = parts[3][2:-1].split(",")
+        if parts[3].startswith('*('):  # TypeOpLoad
+            in0_space_name, in1 = parts[3][2:-1].split(',')
             _in = [
                 AddrSpace.from_raw(in0_space_name),
                 Identifier.from_raw(in1),
             ]
-            return Operation(full_line, addr, False, _op, _in, _out)
+            return Operation(full_line, addr, False, 'LOAD', _in, _out)
 
-        if num_parts == 6 and parts[4] == "+" and "(*" in parts[5]:  # TypeOpPtradd
+        if num_parts == 6 and parts[4] == '+' and '(*' in parts[5]:  # TypeOpPtradd
             split_idx = find_matching_open_paren_to_final_close_paren(parts[5])
-            assert parts[5][split_idx:].startswith("(*"), f"Incorrect PTRADD: {parts}\n  {full_line}"
+            assert parts[5].startswith('(*', split_idx), f'Incorrect PTRADD: {parts}\n  {full_line}'
             a, b = parts[5][:split_idx], parts[5][split_idx + 2:-1]
             _in = [Identifier.from_raw(parts[3]), Identifier.from_raw(a), Identifier.from_raw(b)]
-            return Operation(full_line, addr, False, "PTRADD", _in, _out)
+            return Operation(full_line, addr, False, 'PTRADD', _in, _out)
 
         # Parse the base classes that have a set ::printRaw format
         if num_parts == 4:  # TypeOpFunc / COPY
@@ -799,11 +791,11 @@ class Operation:
             }
 
             _op = None
-            if "(" in parts[3]:
-                op_name, args = parts[3].split("(", 1)
+            args = ''
+            if '(' in parts[3]:
+                op_name, args = parts[3].split('(', 1)
 
                 def disambiguate_numbers(s: str) -> tuple[str, str]:
-                    numbers = op_name[6:]
                     if len(s) == 2:
                         return (s[0], s[1])
 
@@ -821,46 +813,46 @@ class Operation:
                     if len(s) == 4:
                         return (s[:2], s[2:])
 
-                    raise ValueError(f"Unexpected numbers string: {s!r}")
+                    raise ValueError(f'Unexpected length of numbers string: {s!r}')
 
-                if op_name.startswith("ZEXT"):
+                if op_name.startswith('ZEXT'):
                     numbers = disambiguate_numbers(op_name[4:])
-                    _op = f"INT_ZEXT({numbers[0]}, {numbers[1]})"
-                elif op_name.startswith("SEXT"):
+                    _op = f'INT_ZEXT({numbers[0]}, {numbers[1]})'
+                elif op_name.startswith('SEXT'):
                     numbers = disambiguate_numbers(op_name[4:])
-                    _op = f"INT_SEXT({numbers[0]}, {numbers[1]})"
-                elif op_name.startswith("CARRY"):
-                    _op = f"INT_CARRY({op_name[5:]})"
-                elif op_name.startswith("SCARRY"):
-                    _op = f"INT_SCARRY({op_name[6:]})"
-                elif op_name.startswith("SBORROW"):
-                    _op = f"INT_SBORROW({op_name[7:]})"
-                elif op_name.startswith("CONCAT"):
+                    _op = f'INT_SEXT({numbers[0]}, {numbers[1]})'
+                elif op_name.startswith('CARRY'):
+                    _op = f'INT_CARRY({op_name[5:]})'
+                elif op_name.startswith('SCARRY'):
+                    _op = f'INT_SCARRY({op_name[6:]})'
+                elif op_name.startswith('SBORROW'):
+                    _op = f'INT_SBORROW({op_name[7:]})'
+                elif op_name.startswith('CONCAT'):
                     numbers = disambiguate_numbers(op_name[6:])
-                    _op = f"PIECE({numbers[0]}, {numbers[1]})"
-                elif op_name.startswith("SUB"):
+                    _op = f'PIECE({numbers[0]}, {numbers[1]})'
+                elif op_name.startswith('SUB'):
                     numbers = disambiguate_numbers(op_name[3:])
-                    _op = f"SUBPIECE({numbers[0]}, {numbers[1]})"
+                    _op = f'SUBPIECE({numbers[0]}, {numbers[1]})'
                 elif op_name in op_trans_dict:
                     _op = op_trans_dict[op_name]
 
             # set inputs
             if _op is None:
-                _op = "COPY"
+                _op = 'COPY'
                 _in = [Identifier.from_raw(parts[3])]
             else:
-                assert args[-1] == ")", (args, parts)
-                _in = [Identifier.from_raw(i) for i in args[:-1].split(",")]
+                assert args[-1] == ')', (args, parts)
+                _in = [Identifier.from_raw(i) for i in args[:-1].split(',')]
 
             return Operation(full_line, addr, False, _op, _in, _out)
 
         if num_parts == 5:  # TypeOpUnary
             _op = {
-                "-": "INT_2COMP",  # or FLOAT_NEG
-                "~": "INT_NEGATE",
-                "!": "BOOL_NEGATE",
+                '-': 'INT_2COMP',  # or FLOAT_NEG
+                '~': 'INT_NEGATE',
+                '!': 'BOOL_NEGATE',
                 # The operators below are unofficial
-                "f-": "FLOAT_NEG",
+                'f-': 'FLOAT_NEG',
             }[parts[3]]
 
             _in = [Identifier.from_raw(parts[4])]
@@ -905,18 +897,19 @@ class Operation:
             _in = [Identifier.from_raw(parts[3]), Identifier.from_raw(parts[5])]
             return Operation(full_line, addr, False, _op, _in, _out)
 
-        raise ValueError(f"Unparsable printRaw output: {parts}")
+        raise ValueError(f'Unparsable printRaw output: {parts}')
 
     def __str__(self) -> str:
         if self._is_empty:
-            return f"{self._addr}: **"
+            return f'{self._addr}: **'
 
-        out = f"{self._addr}: "
+        out = f'{self._addr}: '
 
         if self._out is not None:
-            out += f"{self._out} <- "
+            out += f'{self._out} <- '
 
-        return out + f"{self._op} [ {' , '.join(str(x) for x in self._in)} ]"
+        out += f'{self._op} [ {" , ".join(str(x) for x in self._in)} ] - parsed from: {self._line!r}'
+        return out
 
     def __hash__(self) -> int:
         if self._is_empty:
@@ -927,7 +920,7 @@ class Operation:
         return self._op
 
     def get_color_name(self) -> str:
-        return "red"
+        return 'red'
 
-    def get_tooltip_text(self) -> typing.Optional[str]:
+    def get_tooltip_text(self) -> str:
         return self.__str__()

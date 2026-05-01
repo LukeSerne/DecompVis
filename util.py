@@ -338,7 +338,7 @@ class Identifier:
                     Identifier.from_raw(part[1:-1])
                 except:
                     print(f"Warning: Unexpected parenthesised group at the end of varnode: {name!r} - {part[1:-1]}")
-                    traceback.format_exc()
+                    traceback.print_exc()
 
             name = name[:start_idx]
 
@@ -785,20 +785,27 @@ class Operation:
         # Parse the base classes that have a set ::printRaw format
         if num_parts == 4:  # TypeOpFunc / COPY
             op_trans_dict: dict[str, str] = {
-                "NAN": "FLOAT_NAN",
-                "ABS": "FLOAT_ABS",
-                "SQRT": "FLOAT_SQRT",
-                "INT2FLOAT": "FLOAT_INT2FLOAT",
-                "FLOAT2FLOAT": "FLOAT_FLOAT2FLOAT",
-                "TRUNC": "FLOAT_TRUNC",
-                "CEIL": "FLOAT_CEIL",
-                "FLOOR": "FLOAT_FLOOR",
-                "ROUND": "FLOAT_ROUND",
-                "INSERT": "INSERT",
-                "EXTRACT": "EXTRACT",
-                "POPCOUNT": "POPCOUNT",
-                "COUNTLEADINGZEROS": "COUNTLEADINGZEROS",
-                "COUNTLEADINGONES": "COUNTLEADINGONES",
+                'NAN': 'FLOAT_NAN',
+                'ABS': 'FLOAT_ABS',
+                'SQRT': 'FLOAT_SQRT',
+                'INT2FLOAT': 'FLOAT_INT2FLOAT',
+                'FLOAT2FLOAT': 'FLOAT_FLOAT2FLOAT',
+                'TRUNC': 'FLOAT_TRUNC',
+                'CEIL': 'FLOAT_CEIL',
+                'FLOOR': 'FLOAT_FLOOR',
+                'ROUND': 'FLOAT_ROUND',
+                'INSERT': 'INSERT',
+                'ZPULL': 'ZPULL',
+                'POPCOUNT': 'POPCOUNT',
+                'LZCOUNT': 'LZCOUNT',
+                'SPULL': 'SPULL',
+                # Old name
+                'EXTRACT': 'ZPULL',
+                'COUNTLEADINGZEROS': 'LZCOUNT',
+                # Unofficial P-code OPs
+                'BITREV': 'BITREV',  # https://github.com/NationalSecurityAgency/ghidra/pull/9078
+                'TZCOUNT': 'TZCOUNT',  # https://github.com/NationalSecurityAgency/ghidra/pull/9078
+                'COUNTLEADINGONES': 'COUNTLEADINGONES',  # https://github.com/NationalSecurityAgency/ghidra/pull/2810
             }
 
             _op = None
@@ -812,9 +819,10 @@ class Operation:
 
                     # This is an ugly hack that guesses that one of the two
                     # numbers is a power of two. That seems to disambiguate
-                    # correctly most of the time, but there's no guarantee
-                    # it works. It'd be really great if the numbers were not
-                    # printed in an ambiguous way...
+                    # correctly most of the time, but there's no guarantee it
+                    # works. It would be great if the numbers were not printed
+                    # in an ambiguous way...
+                    # ref. https://github.com/NationalSecurityAgency/ghidra/pull/816
                     if len(s) == 3:
                         n = int(s[:2])
                         if n & (n - 1) == 0 and n != 0:
@@ -871,38 +879,38 @@ class Operation:
 
         if num_parts == 6:  # TypeOpBinary / TypeOpPtrsub
             _op = {
-                "==": "INT_EQUAL",  # or FLOAT_EQUAL
-                "!=": "INT_NOTEQUAL",  # or FLOAT_NOTEQUAL
-                "<": "INT_LESS",  # or INT_SLESS or FLOAT_LESS
-                "<=": "INT_LESSEQUAL",  # or INT_SLESSEQUAL or FLOAT_LESSEQUAL
-                "+": "INT_ADD",  # or FLOAT_ADD
-                "-": "INT_SUB",  # or FLOAT_SUB
-                "^": "INT_XOR",
-                "&": "INT_AND",
-                "|": "INT_OR",
-                "<<": "INT_LEFT",
-                ">>": "INT_RIGHT",
-                "s>>": "INT_SRIGHT",
-                "*": "INT_MULT",  # or FLOAT_MULT
-                "/": "INT_DIV",  # or INT_SDIV or FLOAT_DIV
-                "%": "INT_REM",  # or INT_SREM
-                "^^": "BOOL_XOR",
-                "&&": "BOOL_AND",
-                "||": "BOOL_OR",
-                "->": "PTRSUB",
+                '==': 'INT_EQUAL',  # or FLOAT_EQUAL
+                '!=': 'INT_NOTEQUAL',  # or FLOAT_NOTEQUAL
+                '<': 'INT_LESS',  # or INT_SLESS or FLOAT_LESS
+                '<=': 'INT_LESSEQUAL',  # or INT_SLESSEQUAL or FLOAT_LESSEQUAL
+                '+': 'INT_ADD',  # or FLOAT_ADD
+                '-': 'INT_SUB',  # or FLOAT_SUB
+                '^': 'INT_XOR',
+                '&': 'INT_AND',
+                '|': 'INT_OR',
+                '<<': 'INT_LEFT',
+                '>>': 'INT_RIGHT',
+                's>>': 'INT_SRIGHT',
+                '*': 'INT_MULT',  # or FLOAT_MULT
+                '/': 'INT_DIV',  # or INT_SDIV or FLOAT_DIV
+                '%': 'INT_REM',  # or INT_SREM
+                '^^': 'BOOL_XOR',
+                '&&': 'BOOL_AND',
+                '||': 'BOOL_OR',
+                '->': 'PTRSUB',
                 # The operators below are unofficial
-                "f==": "FLOAT_EQUAL",
-                "f!=": "FLOAT_NOTEQUAL",
-                "s<": "INT_SLESS",
-                "f<": "FLOAT_LESS",
-                "s<=": "INT_SLESSEQUAL",
-                "f<=": "FLOAT_LESSEQUAL",
-                "f+": "FLOAT_ADD",
-                "f-": "FLOAT_SUB",
-                "f*": "FLOAT_MULT",
-                "s/": "INT_SDIV",
-                "f/": "FLOAT_DIV",
-                "s%": "INT_SREM",
+                'f==': 'FLOAT_EQUAL',
+                'f!=': 'FLOAT_NOTEQUAL',
+                's<': 'INT_SLESS',
+                'f<': 'FLOAT_LESS',
+                's<=': 'INT_SLESSEQUAL',
+                'f<=': 'FLOAT_LESSEQUAL',
+                'f+': 'FLOAT_ADD',
+                'f-': 'FLOAT_SUB',
+                'f*': 'FLOAT_MULT',
+                's/': 'INT_SDIV',
+                'f/': 'FLOAT_DIV',
+                's%': 'INT_SREM',
             }[parts[4]]
 
             _in = [Identifier.from_raw(parts[3]), Identifier.from_raw(parts[5])]

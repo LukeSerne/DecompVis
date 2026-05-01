@@ -65,7 +65,7 @@ def html_get_nth_char_idx(target_str: str, n: int) -> int:
 
     raise ValueError(f"Supplied index {n} out of range for string {target_str}")
 
-def colourise_diff(diff: list[str]) -> str:
+def colourise_diff(diff: collections.abc.Iterator[str]) -> str:
     """
     This function adds markup to the input string, which is assumed to be a diff
     as produced by difflib. The returned string contains a HTML description of a
@@ -285,7 +285,7 @@ class AddrSpace:
     def get_color_name(self) -> str:
         return "brown"
 
-    def get_tooltip_text(self) -> typing.Optional[str]:
+    def get_tooltip_text(self) -> str | None:
         return None
 
 @dataclass(frozen=True)
@@ -294,8 +294,8 @@ class Identifier:
     _is_free: bool = False
     _is_input: bool = False
     _is_written: bool = False
-    _size: typing.Optional[int] = None
-    _seq_num: typing.Optional[tuple[int, int]] = None
+    _size: int | None = None
+    _seq_num: tuple[int, int] | None = None
     _space_shortcut: str = ""
     _name: str = ""
 
@@ -364,7 +364,7 @@ class Identifier:
         is_addr = lambda n: n.startswith("invalid_addr") or n.startswith("0x")
         space_shortcut = name[0]
 
-        def parse_addr_space(data: str) -> typing.Optional[str]:
+        def parse_addr_space(data: str) -> str | None:
             """
             Parses an address space description, as produced by 'AddrSpace::printRaw',
             and returns a normalised string version. If parsing fails, this
@@ -518,7 +518,7 @@ class Identifier:
             return "gray"
         return "green"
 
-    def get_tooltip_text(self) -> typing.Optional[str]:
+    def get_tooltip_text(self) -> str | None:
         return self.__str__()
 
 @dataclass(frozen=True)
@@ -538,7 +538,7 @@ class InstructionReference:
     def get_color_name(self) -> str:
         return 'blue'
 
-    def get_tooltip_text(self) -> typing.Optional[str]:
+    def get_tooltip_text(self) -> str | None:
         return None
 
 @dataclass(frozen=True)
@@ -552,9 +552,9 @@ class Operation:
     # the CPUI name of this operation
     _op: str
     # a sequence of inputs
-    _in: typing.Sequence[Identifier | AddrSpace | InstructionReference | None]
+    _in: collections.abc.Sequence[Identifier | AddrSpace | InstructionReference | None]
     # the output identifier
-    _out: typing.Optional[Identifier]
+    _out: Identifier | None
 
     @staticmethod
     def from_raw(line: bytes) -> "Operation":
@@ -566,8 +566,8 @@ class Operation:
         addr = tuple(map(lambda n: int(n, 16), parts[0][:-1].split(":")))
         num_parts = len(parts)
 
-        _in: typing.Sequence[Identifier | AddrSpace | InstructionReference | None] = []
-        _op: typing.Optional[str] = None
+        _in: collections.abc.Sequence[Identifier | AddrSpace | InstructionReference | None] = []
+        _op: str | None = None
 
         # might be ** (empty)
         is_empty = parts[1] == "**" and num_parts == 2

@@ -2,34 +2,38 @@ import networkx
 import pwn
 
 from dataclasses import dataclass
+import collections.abc
 import typing
 import traceback
 import itertools
 
-def find_runs(haystack: str, needles: list[str]):
-    """
-    A generator that yields 3-tuples (needle_type, start_idx, end_idx) for every
-    run of consecutive needles of the same type in the string 'haystack'.
+def find_runs(haystack: str, needles: collections.abc.Container[str]) -> collections.abc.Generator[tuple[str, int, int]]:
+    '''
+    A generator that yields 3-tuples (needle, start_idx, end_idx) for every run
+    of consecutive needles of the same type in the string 'haystack'.
     Assumes all needles are 1 character long.
-    """
-    idx = 0
+    '''
+    run_type: str | None = None
+    run_len = 0
 
-    while True:
-        next_needles = {needle: haystack.find(needle, idx) for needle in needles}
-        try:
-            needle_type = min([k for k in next_needles.keys() if next_needles[k] != -1], key=next_needles.get)
-        except ValueError:
-            # no needles left in haystack
-            break
+    for idx, char in enumerate(itertools.chain(haystack, [None])):
+        if char not in needles:
+            # finished a run - yield info about this run
+            if run_type is not None:
+                yield (run_type, idx - run_len, idx)
 
-        needle_idx = next_needles[needle_type]
+            run_type = None
+            continue
 
-        for needle_end in range(needle_idx, len(haystack)):
-            if haystack[needle_end] != needle_type:
-                break
+        if char != run_type:
+            # starting a new run - yield info about previous run
+            if run_type is not None:
+                yield (run_type, idx - run_len, idx)
 
-        yield (needle_type, needle_idx, needle_end)
-        idx = needle_end
+            run_type = char
+            run_len = 0
+
+        run_len += 1
 
 def html_escape(text: str) -> str:
     """
@@ -88,7 +92,7 @@ def colourise_diff(diff: list[str]) -> str:
             prev = table_rows.pop()
             prev_is_add = prev.startswith(f'<td bgcolor={ADD_COLOUR!r}>')
 
-            for run_type, high_start, high_end in find_runs(line, ['^', '-', '+']):
+            for run_type, high_start, high_end in find_runs(line, {'^', '-', '+'}):
                 bg_col = BOLD_ADD_COLOUR if prev_is_add else BOLD_REM_COLOUR
                 chunk_start = html_get_nth_char_idx(prev, offset + high_start)
                 chunk_end = html_get_nth_char_idx(prev, offset + high_end)

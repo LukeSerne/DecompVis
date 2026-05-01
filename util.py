@@ -408,7 +408,10 @@ class Identifier:
 
         elif space_shortcut == "u":  # IPTR_INTERNAL
             # name = "u" addr_space
-            name = parse_addr_space(name[1:])
+            addr_space = parse_addr_space(name[1:])
+            if addr_space is None:
+                raise ValueError(f'Invalid address space: {name[1:]!r}. {name=!r}')
+            name = addr_space
 
         elif space_shortcut == "f" and name.startswith("ffunc_"):  # IPTR_FSPEC - cf. FspecSpace::printRaw
             # name == "f" function_name -- this case is not handled here because
@@ -564,6 +567,7 @@ class Operation:
         parts = full_line.split(" ")
         assert parts[0].endswith(":"), line
         addr = tuple(map(lambda n: int(n, 16), parts[0][:-1].split(":")))
+        assert len(addr) == 2, (addr, parts)
         num_parts = len(parts)
 
         _in: collections.abc.Sequence[Identifier | AddrSpace | InstructionReference | None] = []
@@ -688,7 +692,10 @@ class Operation:
             else:
                 _out = None
 
-            _in = [Identifier.from_raw(i) for i in function.split('(', 1)[1][:-1].split(',')]
+            args_idx = find_matching_open_paren_to_final_close_paren(function)
+            args = function[args_idx + 1:-1]
+
+            _in = [Identifier.from_raw(i) for i in args.split(',')]
             _in.insert(1, None)  # BUG? input 1 (type of value to return) is not printed?
             return Operation(full_line, addr, False, 'CPOOLREF', _in, _out)
 

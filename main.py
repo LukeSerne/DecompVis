@@ -254,6 +254,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     # Yes - add the fully qualified name to the list of function
                     # names.
                     func_name = function.get('name')
+                    assert func_name is not None, function
 
                     if "::" in func_name:
                         raise ValueError(f"Function names containing '::' are not supported by the decompiler ({func_name!r})")
@@ -401,6 +402,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         Handles the selected entry in the list changing
         """
+        assert self.decomp is not None
         state = self.decomp.get_state(new_index)
 
         self.graph_view.set_graph(state.get_graph())

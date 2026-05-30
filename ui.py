@@ -1,4 +1,4 @@
-from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, QVariantAnimation
+from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, QVariantAnimation, QSettings
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -11,6 +11,7 @@ from PySide6.QtGui import (
     QTransform,
 )
 from PySide6.QtWidgets import (
+    QMessageBox,
     QDockWidget,
     QGraphicsItem,
     QGraphicsObject,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QGridLayout,
     QHBoxLayout,
+    QVBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -26,11 +28,14 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QTextEdit,
     QWidget,
+    QFileDialog,
+    QDialog,
 )
 import networkx
 
 import math
 import typing
+import pathlib
 from collections.abc import Iterator
 
 from util import Operation, layout_algorithm
@@ -392,6 +397,17 @@ class GraphView(QGraphicsView):
 
             self.scene().addItem(Edge(source, dest, offset, slots, dotted))
 
+        # # Add a nice margin to allow panning past the nodes
+        # rect = self.scene().itemsBoundingRect()
+        # print(rect)
+
+        # Scroll to the center of all items
+        # self.show()
+        # margin = 100
+        # rect.adjust(-margin, -margin, margin, margin)
+        # print(rect)
+        # self.scene().setSceneRect(rect)
+
     def get_nodes(self) -> Iterator[Node]:
         """
         Returns an iterator that yields all nodes that are in the scene.
@@ -594,3 +610,121 @@ class InformationDockWidget(QDockWidget):
     def set_contents(self, pcode_text: str, diff_text: str):
         self.pcode_tab.setText(pcode_text)
         self.diff_tab.setText(diff_text)
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, settings: QSettings, parent: 'main.MainWindow'):
+        super().__init__(parent)
+        self.settings = settings
+        self.main_window = parent
+        self.setWindowTitle('Settings')
+        self.setMinimumWidth(560)
+
+        def make_row(label_text: str, key: str, is_dir: bool) -> tuple[QHBoxLayout, QLineEdit]:
+            lbl = QLabel(label_text)
+            edit = QLineEdit()
+            btn = QPushButton('...')
+
+            def text_changed(new_text: str) -> None:
+                # do sanity checks on the value
+                t = new_text.strip()
+                if not t:
+                    edit.setStyleSheet('')
+                    return
+
+                p = pathlib.Path(t)
+                if not p.exists():
+                    edit.setStyleSheet('color: #a00;')   # missing
+                    return
+
+                if key == 'decomp_dbg_path':
+                    ok = self.main_window._try_set_decomp_dbg_path(p)
+                elif key == 'ghidra_dir':
+                    ok = self.main_window._try_set_ghidra_dir(p, False)
+
+                    # Also check if we can automatically detect 'decomp_dbg'
+                    if ok:
+                        decomp_dbg_path = p / 'Ghidra' / 'Features' / 'Decompiler' / 'src' / 'decompile' / 'cpp' / 'decomp_dbg'
+                        ok2 = self.main_window._try_set_decomp_dbg_path(decomp_dbg_path)
+                        if ok2:
+                            self.decomp_edit.setText(str(decomp_dbg_path))
+                else:
+                    raise ValueError(f'Unexpected settings key {key!r}')
+
+                if ok:
+                    edit.setStyleSheet('color: #0a0;')   # exists
+                else:
+                    edit.setStyleSheet('color: #a50;')   # wrong type
+
+            def browse() -> None:
+                base_path: pathlib.Path = self.settings.value(key, defaultValue=pathlib.Path.home())
+                if not base_path.is_dir():
+                    base_path = base_path.parent
+
+                if is_dir:
+                    p = QFileDialog.getExistingDirectory(self, 'Select', str(base_path))
+                else:
+                    p, _ = QFileDialog.getOpenFileName(self, 'Select', str(base_path))
+
+                edit.setText(p)
+
+            btn.clicked.connect(browse)
+            edit.textChanged.connect(text_changed)
+
+            h = QHBoxLayout()
+            h.addWidget(lbl)
+            h.addWidget(edit, 1)
+            h.addWidget(btn)
+            return h, edit
+
+        row1, self.ghidra_edit = make_row('Ghidra directory:', 'ghidra_dir', True)
+        row2, self.decomp_edit = make_row('Decomp_dbg (file):', 'decomp_dbg_path', False)
+
+        save = QPushButton('Save')
+        revert = QPushButton('Revert')
+        close = QPushButton('Close')
+
+        save.clicked.connect(lambda: self._save([
+            ('ghidra_dir', self.ghidra_edit),
+            ('decomp_dbg_path', self.decomp_edit)
+        ]))
+
+        revert.clicked.connect(lambda: self._load([
+            ('ghidra_dir', self.ghidra_edit),
+            ('decomp_dbg_path', self.decomp_edit)
+        ]))
+
+        close.clicked.connect(self.close)
+
+        btns = QHBoxLayout()
+        btns.addStretch()
+        btns.addWidget(revert)
+        btns.addWidget(save)
+        btns.addWidget(close)
+
+        layout = QVBoxLayout()
+        layout.addLayout(row1)
+        layout.addLayout(row2)
+        layout.addLayout(btns)
+        self.setLayout(layout)
+
+        self._load([('ghidra_dir', self.ghidra_edit), ('decomp_dbg_path', self.decomp_edit)])
+
+
+    def _load(self, pairs: list[tuple[str, QLineEdit]]):
+        for key, edit in pairs:
+            value = str(self.settings.value(key, defaultValue=''))
+            edit.setText(value)
+
+    def _save(self, pairs):
+        for key, edit in pairs:
+            txt = edit.text().strip()
+            if txt:
+                self.settings.setValue(key, pathlib.Path(txt))
+            else:
+                self.settings.remove(key)
+
+        self.settings.sync()
+        QMessageBox.information(self, 'Saved', 'The settings have been saved succesfully')
+
+        self._load(pairs)

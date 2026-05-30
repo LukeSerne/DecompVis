@@ -10,7 +10,7 @@ import difflib
 
 from util import get_decompile_data, make_xpath_string, colourise_diff, html_escape
 from decomp import Decomp
-from ui import GraphView, ZoomSliderWidget, SearchWidget, InformationDockWidget
+from ui import GraphView, ZoomSliderWidget, SearchWidget, InformationDockWidget, SettingsDialog
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -46,14 +46,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         load_xml_act = QtGui.QAction("Load XML file", self)
         load_xml_act.triggered.connect(self._handle_set_xml_file)
-        set_ghidra_dir_act = QtGui.QAction("Set Ghidra folder", self)
-        set_ghidra_dir_act.triggered.connect(self._handle_set_ghidra_dir)
-        set_decomp_dbg_path_act = QtGui.QAction("Set decomp_dbg file", self)
-        set_decomp_dbg_path_act.triggered.connect(self._handle_set_decomp_dbg_path)
+        show_settings_act = QtGui.QAction('Show settings', self)
+        show_settings_act.triggered.connect(self._handle_show_settings)
 
         file_menu.addAction(load_xml_act)
-        file_menu.addAction(set_ghidra_dir_act)
-        file_menu.addAction(set_decomp_dbg_path_act)
+        file_menu.addAction(show_settings_act)
 
         view_menu = menu_bar.addMenu("&View")
 
@@ -131,7 +128,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if initial_xml is not None:
             self._parse_xml_file(initial_xml)
 
-    def _try_set_ghidra_dir(self, ghidra_dir: pathlib.Path) -> bool:
+    def _try_set_ghidra_dir(self, ghidra_dir: pathlib.Path, show_message: bool) -> bool:
         """
         Try to set the Ghidra folder. If this fails (because the folder does
         not exist), False is returned. Otherwise, settings.ini is updated and
@@ -141,6 +138,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return False
 
         if not (ghidra_dir / 'Ghidra').is_dir():  # weird path
+            if not show_message:
+                return False
+
             result = QtWidgets.QMessageBox.warning(
                 self,
                 'Weird Ghidra path',
@@ -271,31 +271,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.xml_func_name = function_names[0]
         self.load_decomp_data()
 
-    def _handle_set_ghidra_dir(self):
-
-        while True:
-            ghidra_dir = QtWidgets.QFileDialog.getExistingDirectory(
-                self, "Choose the Ghidra Installation folder"
-            )
-
-            if not ghidra_dir:  # No folder was selected
-                return
-
-            if self._try_set_ghidra_dir(pathlib.Path(ghidra_dir)):
-                return
-
-    def _handle_set_decomp_dbg_path(self):
-
-        while True:
-            decomp_dbg_path = QtWidgets.QFileDialog.getOpenFileName(
-                self, "Choose the decomp_dbg executable"
-            )[0]
-
-            if not decomp_dbg_path:  # No file was selected
-                return
-
-            if self._try_set_decomp_dbg_path(pathlib.Path(decomp_dbg_path)):
-                return
+    def _handle_show_settings(self):
+        SettingsDialog(self.settings, self).open()
 
     def _handle_zoom_in(self, cursor_is_center: bool = False):
         if self.zoom_idx == len(self.zoom_levels) - 1:  # already fully zoomed in

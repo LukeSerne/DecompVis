@@ -19,7 +19,10 @@ class DecompState:
         # Create a data flow graph out of the given operations
 
         edges_to_create: list[
-            tuple[tuple[int, int] | InstructionReference | Identifier | AddrSpace, tuple[int, int] | InstructionReference | Identifier]
+            tuple[tuple[int, int] | InstructionReference | Identifier | AddrSpace,
+                  tuple[int, int] | InstructionReference | Identifier,
+                  dict[str, bool]
+            ]
         ] = []
 
         operations = [
@@ -46,7 +49,7 @@ class DecompState:
                 if out_node not in self._state:
                     self._state.add_node(out_node, node_item=out_node)
 
-                edges_to_create.append((op._addr, out_node))
+                edges_to_create.append((op._addr, out_node, {'dotted': False}))
 
             # Add input edges (and varnodes if necessary)
             for inp in op._in:
@@ -66,7 +69,7 @@ class DecompState:
                     else:
                         edges_to_create.append((target, inp, {'dotted': True}))
 
-                edges_to_create.append((inp, op._addr))
+                edges_to_create.append((inp, op._addr, {'dotted': False}))
 
         self._state.add_edges_from(edges_to_create)
 

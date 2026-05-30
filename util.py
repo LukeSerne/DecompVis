@@ -6,6 +6,10 @@ import collections.abc
 import typing
 import traceback
 import itertools
+import pathlib
+
+if typing.TYPE_CHECKING:
+    import ui
 
 def find_runs(haystack: str, needles: collections.abc.Container[str]) -> collections.abc.Generator[tuple[str, int, int]]:
     '''
@@ -105,7 +109,7 @@ def colourise_diff(diff: collections.abc.Iterator[str]) -> str:
 
     return '<table width="100%"><tr>' + '</tr><tr>'.join(table_rows) + '</tr></table>'
 
-def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str, extra_paths: list[str]) -> list[tuple[bytes, bytes]]:
+def get_decompile_data(decomp_path: str, ghidra_path: str, xml_path: str, func_name: str, extra_paths: list[pathlib.Path]) -> list[tuple[bytes, bytes]]:
     """
     Executes the decompiler on the given xml file and returns the P-CODE diffs
     and initial P-CODE.
@@ -238,7 +242,7 @@ def find_matching_open_paren_to_final_close_paren(string: str) -> int:
 
     return len(string) - 1 - i
 
-def layout_algorithm(graph: networkx.DiGraph, layout_prog='dot') -> dict['Node', tuple[float, float]]:
+def layout_algorithm(graph: networkx.DiGraph, layout_prog='dot') -> dict['ui.Node', tuple[float, float]]:
     # Create a mapping from node objects to unique string identifiers
     node_to_str = {node: str(i) for i, node in enumerate(graph.nodes())}
     str_to_node = {v: k for k, v in node_to_str.items()}
@@ -295,7 +299,7 @@ class Identifier:
     _is_input: bool = False
     _is_written: bool = False
     _size: int | None = None
-    _seq_num: tuple[int, int] | None = None
+    _seq_num: tuple[int | None, int] | None = None
     _space_shortcut: str = ""
     _name: str = ""
 
@@ -325,7 +329,8 @@ class Identifier:
             elif part.startswith("(0x"):
                 # part might be "(0x800fb41c:61)"
                 is_written = True
-                seq_num = tuple(map(lambda s: int(s, 16), part[1:-1].split(":")))
+                addr, time = part[1:-1].split(':', maxsplit=1)
+                seq_num = (int(addr, 16), int(time, 16))
             else:
                 # part might be:
                 # - "(#0x6)" or
@@ -695,7 +700,7 @@ class Operation:
             args_idx = find_matching_open_paren_to_final_close_paren(function)
             args = function[args_idx + 1:-1]
 
-            _in = [Identifier.from_raw(i) for i in args.split(',')]
+            _in.extend(Identifier.from_raw(i) for i in args.split(','))
             _in.insert(1, None)  # BUG? input 1 (type of value to return) is not printed?
             return Operation(full_line, addr, False, 'CPOOLREF', _in, _out)
 

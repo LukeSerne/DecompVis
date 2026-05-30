@@ -89,11 +89,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.load_data_done.connect(self._process_load_decomp_data)
 
         # Initialise settings ini, and load the ghidra dir
-        self.settings = QtCore.QSettings(str(pathlib.Path(__file__).parent / 'settings.ini'), QtCore.QSettings.IniFormat)
+        self.settings = QtCore.QSettings(str(pathlib.Path(__file__).parent / 'settings.ini'), QtCore.QSettings.Format.IniFormat)
         dir_value = self.settings.value("ghidra_dir")
         decomp_dbg_path_value = self.settings.value("decomp_dbg_path")
 
-        if dir_value is not None and not self._try_set_ghidra_dir(dir_value):
+        if dir_value is not None and not self._try_set_ghidra_dir(dir_value, False):
             # dir is invalid, reset ini
             self.ghidra_dir = None
             self.settings.setValue("ghidra_dir", self.ghidra_dir)
@@ -141,9 +141,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return False
 
         if not (ghidra_dir / 'Ghidra').is_dir():  # weird path
-            button = QtWidgets.QMessageBox.StandardButton
             result = QtWidgets.QMessageBox.warning(
-                None,
+                self,
                 'Weird Ghidra path',
                 (
                     'The supplied path does not seem like the root folder of a '
@@ -151,18 +150,15 @@ class MainWindow(QtWidgets.QMainWindow):
                     'containing the \'Ghidra\' and \'Extensions\' folder.\n\n'
                     'Do you want to continue regardless?'
                 ),
-                button.Yes | button.No,
-                button.No
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No
             )
 
-            if result == button.No:  # aborted by user
+            if result == QtWidgets.QMessageBox.StandardButton.No:  # aborted by user
                 return False
 
         self.ghidra_dir = ghidra_dir
-        self.settings.setValue("ghidra_dir", self.ghidra_dir)
-
-        if self.decomp_dbg_path is None:
-            self._try_set_decomp_dbg_path(ghidra_dir / "Ghidra" / "Features" / "Decompiler" / "src" / "decompile" / "cpp" / "decomp_dbg")
+        self.settings.setValue('ghidra_dir', ghidra_dir)
 
         return True
 
@@ -176,7 +172,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return False
 
         self.decomp_dbg_path = decomp_dbg_path
-        self.settings.setValue("decomp_dbg_path", self.decomp_dbg_path)
+        self.settings.setValue('decomp_dbg_path', decomp_dbg_path)
 
         return True
 
@@ -193,7 +189,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._parse_xml_file(pathlib.Path(file_name))
         except ValueError:
             QtWidgets.QMessageBox.critical(
-                None,
+                self,
                 "Error communicating with decomp_dbg",
                 (
                     "A fatal error occurred while communicating with the decomp_dbg "
@@ -204,7 +200,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
         except xml.etree.ElementTree.ParseError:
             QtWidgets.QMessageBox.critical(
-                None,
+                self,
                 'Error parsing XML',
                 (
                     'A fatal error occurred while parsing the provided XML file. '
@@ -212,7 +208,6 @@ class MainWindow(QtWidgets.QMainWindow):
                     f'{traceback.format_exc()}'
                 )
             )
-
 
     def _parse_xml_file(self, file_name: pathlib.Path):
         """
@@ -231,24 +226,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
         function_names = []
         for bytechunk in bytechunks:
-            bytechunk_space = make_xpath_string(bytechunk.get("space"))
+            if bytechunk.text is None:
+                raise ValueError(f'Bytechunk {bytechunk} did not contain bytes!')
 
-            bytechunk_start = int(bytechunk.get("offset"), 16)
+            bytechunk_space = make_xpath_string(bytechunk.get('space', ''))
+
+            bytechunk_start = int(bytechunk.get('offset', '0'), 16)
             # Assuming the bytes are stored in hexadecimal, the number of bytes
             # is the number of non-whitespace characters divided by 2.
-            bytechunk_size = len(bytechunk.text.replace(" ", "").replace("\n", "")) // 2
+            bytechunk_size = len(bytechunk.text.replace(' ', '').replace('\n', '')) // 2
             bytechunk_range = range(bytechunk_start, bytechunk_start + bytechunk_size)
 
             # Find the names of all functions defined in the XML file, and filter
             # out those whose offsets are not inside the chunk for which we have
             # bytes
-            for scope in xml_root.findall("./save_state/db/scope"):
-                scope_name = scope.get("name")
+            for scope in xml_root.findall('./save_state/db/scope'):
+                scope_name = scope.get('name')
 
-                for function in scope.findall("./symbollist/mapsym/function"):
-                    # Do we have the bytes for this function?
-                    addr_def = function.find(f"./addr[@space={bytechunk_space}]")
-                    if addr_def is None or int(addr_def.get("offset"), 16) not in bytechunk_range:
+                for function in scope.findall('./symbollist/mapsym/function'):
+                    # Check that this function starts inside the byte range
+                    addr_def = function.find(f'./addr[@space={bytechunk_space}]')
+                    if addr_def is None: continue
+                    if int(addr_def.get('offset', '0'), 16) not in bytechunk_range:
                         continue
 
                     # Yes - add the fully qualified name to the list of function
@@ -256,19 +255,18 @@ class MainWindow(QtWidgets.QMainWindow):
                     func_name = function.get('name')
                     assert func_name is not None, function
 
-                    if "::" in func_name:
-                        raise ValueError(f"Function names containing '::' are not supported by the decompiler ({func_name!r})")
+                    if '::' in func_name:
+                        raise ValueError(f'Function names containing \'::\' are not supported by the decompiler ({func_name!r})')
 
-                    function_names.append(f"{scope_name}::{func_name}")
+                    function_names.append(f'{scope_name}::{func_name}')
 
         if not function_names:
-            raise ValueError("No function definition found in XML file")
+            raise ValueError('No function definition found in XML file')
 
         if len(function_names) > 1:
             # TODO: Handle this case more cleanly - for example by allowing the
             # user to choose one of the functions.
-            print("Found multiple functions - picking first one")
-            print(function_names)
+            print(f'Found multiple functions - picking first one: {function_names}')
 
         self.xml_func_name = function_names[0]
         self.load_decomp_data()
@@ -346,7 +344,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if trace:
             # An exception occurred - cancel loading
             QtWidgets.QMessageBox.critical(
-                None,
+                self,
                 "Error communicating with decomp_dbg",
                 (
                     "A fatal error occurred while communicating with the decomp_dbg "
@@ -384,7 +382,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # Show an error dialog box and return
             QtWidgets.QMessageBox.critical(
-                None,
+                self,
                 'Error while loading XML file',
                 f'{" and ".join(reasons).capitalize()}. Use the actions in the \'File\' menu to resolve this.'
             )

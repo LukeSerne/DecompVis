@@ -35,6 +35,8 @@ from collections.abc import Iterator
 
 from util import Operation, layout_algorithm
 
+if typing.TYPE_CHECKING:
+    import main
 
 class Node(QGraphicsObject):
 
@@ -78,7 +80,7 @@ class Node(QGraphicsObject):
         self._is_selected = False
         self._bg_brush = QBrush(self._color)
         self._border_pen = QPen(
-            self._color.darker(), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+            self._color.darker(), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin
         )
         self._text_pen = QPen(QColor(
             "white" if self._color_name in {"brown", "gray"} else "black"
@@ -89,9 +91,9 @@ class Node(QGraphicsObject):
         self._rect = QRectF(0, 0, name_rect.width() + 10, name_rect.height() + 10)
 
         self.setFlags(
-            QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemSendsGeometryChanges
+            QGraphicsItem.GraphicsItemFlag.ItemIsMovable | QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges
         )
-        self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
         tooltip_text = item.get_tooltip_text()
         if tooltip_text is not None:
@@ -106,7 +108,7 @@ class Node(QGraphicsObject):
 
         # Change the colour when the node is right-clicked, highlight the node
         # when middle-clicked.
-        if ev.button() == Qt.RightButton:
+        if ev.button() == Qt.MouseButton.RightButton:
             color_idx = self.COLOR_NAMES.index(self._color_name)
             self._color_name = self.COLOR_NAMES[(color_idx + 1) % len(self.COLOR_NAMES)]
             self._color = self.COLORS[self._color_name]
@@ -115,7 +117,7 @@ class Node(QGraphicsObject):
                 "white" if self._color_name in {"brown", "gray"} else "black"
             ))
 
-        elif ev.button() == Qt.MiddleButton:
+        elif ev.button() == Qt.MouseButton.MiddleButton:
             self._is_selected = not self._is_selected
 
         else:
@@ -123,7 +125,7 @@ class Node(QGraphicsObject):
 
         border_color = self._color.lighter() if self._is_selected else self._color.darker()
         self._border_pen = QPen(
-            border_color, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+            border_color, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin
         )
         self.update()
 
@@ -140,7 +142,7 @@ class Node(QGraphicsObject):
         path.addRoundedRect(self.boundingRect(), 5, 5)
         return path
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget | None = None):
         """Override from QGraphicsItem
 
         Draw node
@@ -151,16 +153,16 @@ class Node(QGraphicsObject):
         """
         bound_rect = self.boundingRect()
 
-        painter.setRenderHints(QPainter.Antialiasing)
+        painter.setRenderHints(QPainter.RenderHint.Antialiasing)
         painter.setPen(self._border_pen)
         painter.setBrush(self._bg_brush)
         painter.drawRoundedRect(bound_rect, 5, 5)
         painter.setPen(self._text_pen)
-        painter.drawText(bound_rect, Qt.AlignCenter, self._name)
+        painter.drawText(bound_rect, Qt.AlignmentFlag.AlignCenter, self._name)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):
         """Adjusts all edges when the item is moved"""
-        if change == QGraphicsItem.ItemPositionHasChanged:
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             for edge in self._edges:
                 edge.adjust()
 
@@ -188,7 +190,7 @@ class Node(QGraphicsObject):
 
 
 class Edge(QGraphicsItem):
-    def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, is_dotted: bool, parent: QGraphicsItem = None):
+    def __init__(self, source: Node, dest: Node, dest_index: int, dest_num_inputs: int, is_dotted: bool, parent: QGraphicsItem | None = None):
         super().__init__(parent)
         self._source = source
         self._dest = dest
@@ -279,7 +281,8 @@ class Edge(QGraphicsItem):
         )
 
         while not close_enough(out_point, in_point):
-            mid = (out_point + in_point) / 2
+            # * 0.5 instead of / 2 to make typechecker happy
+            mid = (out_point + in_point) * 0.5
 
             if shape.contains(mid):
                 in_point = mid
@@ -303,12 +306,12 @@ class Edge(QGraphicsItem):
 
 
 class GraphView(QGraphicsView):
-    def __init__(self, graph: typing.Optional[networkx.DiGraph], parent=None):
+    def __init__(self, graph: typing.Optional[networkx.DiGraph], parent: 'main.MainWindow'):
         """GraphView constructor
 
         This widget can display a directed graph.
         """
-        super().__init__()
+        super().__init__(parent)
 
         self._main_window = parent
         self._graph = graph
@@ -321,7 +324,7 @@ class GraphView(QGraphicsView):
         self._graph_scale = 10
 
         # Map node name to Node object
-        self._nodes_map: dict[str, tuple[Node, typing.Any]] = {}
+        self._nodes_map: dict[Node, tuple[Node, typing.Any]] = {}
 
         if self._graph is not None:
             self._load_graph()
@@ -340,6 +343,8 @@ class GraphView(QGraphicsView):
 
     def set_pos(self):
         """Set the position of nodes"""
+        if self._graph is None: return
+
         # Compute node position from layout function
         positions = layout_algorithm(self._graph)
 
@@ -359,6 +364,8 @@ class GraphView(QGraphicsView):
         # scene, to make the specific changes between graphs more clear.
         self.scene().clear()
         self._nodes_map.clear()
+
+        if self._graph is None: return
 
         # Add nodes
         for node, node_item in self._graph.nodes(data="node_item"):
@@ -422,23 +429,23 @@ class GraphView(QGraphicsView):
 
 class ZoomSliderWidget(QWidget):
 
-    def __init__(self, num_zoom_levels: int, initial_idx: int, parent: "MainWindow"):
+    def __init__(self, num_zoom_levels: int, initial_idx: int, parent: 'main.MainWindow'):
         """
         Creates and initializes the widget
         """
-        super().__init__()
+        super().__init__(parent)
 
-        self.parent = parent
+        self._main_window = parent
         self.num_zoom_levels = num_zoom_levels
 
-        self.slider = QSlider(Qt.Horizontal)
+        self.slider = QSlider(Qt.Orientation.Horizontal)
         self.minus_button = QPushButton('-')
         self.plus_button = QPushButton('+')
 
         self.slider.setMinimum(0)
         self.slider.setMaximum(num_zoom_levels - 1)
         self.slider.setTickInterval(2)
-        self.slider.setTickPosition(QSlider.TicksAbove)
+        self.slider.setTickPosition(QSlider.TickPosition.TicksAbove)
         self.slider.setPageStep(1)
         self.slider.setTracking(True)
         self.slider.setSliderPosition(initial_idx)
@@ -458,7 +465,7 @@ class ZoomSliderWidget(QWidget):
         """
         Handle the slider being moved - pass the new zoom index to the parent
         """
-        self.parent._handle_update_zoom(self.slider.value())
+        self._main_window._handle_update_zoom(self.slider.value())
 
     def set_zoom_level(self, new_zoom_idx: int):
         """
@@ -568,11 +575,9 @@ class InformationDockWidget(QDockWidget):
     """
 
     def __init__(self, parent: QWidget):
-        super().__init__("Information", parent)
+        super().__init__('Information', parent)
 
         # Create the tab widget
-        self.pcode_tab = QWidget()
-        self.diff_tab = QWidget()
         self.pcode_tab = QTextEdit(self)
         self.diff_tab = QTextEdit(self)
         self.diff_tab.setReadOnly(True)
@@ -581,8 +586,8 @@ class InformationDockWidget(QDockWidget):
         self.pcode_tab.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
 
         tab_widget = QTabWidget(self)
-        tab_widget.addTab(self.pcode_tab, "P-CODE")
-        tab_widget.addTab(self.diff_tab, "Diff")
+        tab_widget.addTab(self.pcode_tab, 'P-CODE')
+        tab_widget.addTab(self.diff_tab, 'Diff')
 
         self.setWidget(tab_widget)
 

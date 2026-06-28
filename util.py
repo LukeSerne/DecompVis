@@ -872,10 +872,9 @@ class Operation:
 
         if num_parts == 5:  # TypeOpUnary
             _op = {
-                '-': 'INT_2COMP',  # or FLOAT_NEG
+                '-': 'INT_2COMP',
                 '~': 'INT_NEGATE',
                 '!': 'BOOL_NEGATE',
-                # The operators below are unofficial
                 'f-': 'FLOAT_NEG',
             }[parts[3]]
 
@@ -884,26 +883,25 @@ class Operation:
 
         if num_parts == 6:  # TypeOpBinary / TypeOpPtrsub
             _op = {
-                '==': 'INT_EQUAL',  # or FLOAT_EQUAL
-                '!=': 'INT_NOTEQUAL',  # or FLOAT_NOTEQUAL
-                '<': 'INT_LESS',  # or INT_SLESS or FLOAT_LESS
-                '<=': 'INT_LESSEQUAL',  # or INT_SLESSEQUAL or FLOAT_LESSEQUAL
-                '+': 'INT_ADD',  # or FLOAT_ADD
-                '-': 'INT_SUB',  # or FLOAT_SUB
+                '==': 'INT_EQUAL',
+                '!=': 'INT_NOTEQUAL',
+                '<': 'INT_LESS',
+                '<=': 'INT_LESSEQUAL',
+                '+': 'INT_ADD',
+                '-': 'INT_SUB',
                 '^': 'INT_XOR',
                 '&': 'INT_AND',
                 '|': 'INT_OR',
                 '<<': 'INT_LEFT',
                 '>>': 'INT_RIGHT',
                 's>>': 'INT_SRIGHT',
-                '*': 'INT_MULT',  # or FLOAT_MULT
-                '/': 'INT_DIV',  # or INT_SDIV or FLOAT_DIV
-                '%': 'INT_REM',  # or INT_SREM
+                '*': 'INT_MULT',
+                '/': 'INT_DIV',
+                '%': 'INT_REM',
                 '^^': 'BOOL_XOR',
                 '&&': 'BOOL_AND',
                 '||': 'BOOL_OR',
                 '->': 'PTRSUB',
-                # The operators below are unofficial
                 'f==': 'FLOAT_EQUAL',
                 'f!=': 'FLOAT_NOTEQUAL',
                 's<': 'INT_SLESS',
